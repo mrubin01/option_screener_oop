@@ -1,0 +1,17 @@
+name: option_screener_oop  # Name of the Conda environment
+
+channels:
+  - conda-forge        # Preferred community-maintained packages
+  - defaults
+
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - pip                # Required if using pip section
+  - pip:
+      - requests
+      - yfinance==0.2.59
+      - curl-cffi==0.10.0
+      - alpaca-trade-api
+      - alpha_vantage==2.3.1
