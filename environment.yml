@@ -9,6 +9,7 @@ dependencies:
   - numpy
   - pandas
   - requests_cache
+  - scikit-learn
   - pip                # Required if using pip section
   - pip:
       - requests
