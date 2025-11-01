@@ -3,7 +3,8 @@ from datetime import datetime
 import requests_cache
 import requests
 import pandas as pd
-
+import numpy as np
+import functions
 
 class Asset(object):
     # constructor
@@ -83,18 +84,21 @@ class Equity(Asset):
             if data.empty:
                 raise ValueError("No data returned for ticker")
             close_prices = data['Close']
-            lowest = round(close_prices.min()[self._symbol], 2)
-            highest = round(close_prices.max()[self._symbol], 2)
-            avg_close_price = round(close_prices.mean()[self._symbol], 2)
-            avg_close_price_7d = round(close_prices.tail(7).mean()[self._symbol], 2)
-            avg_close_price_30d = round(close_prices.tail(30).mean()[self._symbol], 2)
-            last_close_price = round(close_prices.iloc[-1][self._symbol], 2)
-            first_close_price = round(close_prices.iloc[0][self._symbol], 2)
+            low = round(close_prices.min()[self._symbol], 2)
+            high = round(close_prices.max()[self._symbol], 2)
+            avg_price = round(close_prices.mean()[self._symbol], 2)
+            avg_price_7d = round(close_prices.tail(7).mean()[self._symbol], 2)
+            avg_price_30d = round(close_prices.tail(30).mean()[self._symbol], 2)
+            last_price = round(close_prices.iloc[-1][self._symbol], 2)
+            first_price = round(close_prices.iloc[0][self._symbol], 2)
+            price_trend = functions.get_price_trend(close_prices)
 
         except Exception as e:
             print(f"Download failed: {e}")
-            return [-1, -1, -1, -1, -1, -1, -1]
+            return [-1, -1, -1, -1, -1, -1, -1, -1]
 
-        return [lowest, highest, first_close_price, last_close_price, avg_close_price, avg_close_price_7d, avg_close_price_30d]
+        return [low, high, first_price, last_price, avg_price, avg_price_7d, avg_price_30d, price_trend]
+
+
 
 

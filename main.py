@@ -23,7 +23,7 @@ EXCHANGES = ["NYSE", "NASDAQ", "ARCA"]
 SCOPE = 0  # 0 only tickers with options, 1 whole ticker list
 WRITE_TICKERS_TO_FILE = 0
 MIN_BID_PRICE = 0.2
-TREND = 2  # 0 no trend, 1 downtrend, 2 uptrend
+TREND = -1  # -1 no trend, 0 downtrend, 1 uptrend
 HAVE_OPTIONS = 0  # 0 no active options, 1 with active options
 MAX_STOCK_PRICE = 1000
 YEAR, MONTH, DAY = 2025, 11, [21, 28]
@@ -42,9 +42,8 @@ if STOCK_EXCHANGE in [0, 1]:
             price_data = ticker.get_high_low_price()
             lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
             avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
-
-
-
+            trend = price_data[7]
+            print(trend)
 
 elif STOCK_EXCHANGE == 2:
     pass
