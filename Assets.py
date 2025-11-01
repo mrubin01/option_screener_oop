@@ -46,6 +46,30 @@ class Equity(Asset):
         else:
             print("Invalid exchange! It must be a string")
 
+    def get_info(self):
+        """ Call Yahoo Finance API and store data into a dict
+            If info is empty, call the api with no user-agent """
+        beta = "N/A"
 
+        try:
+            stock = yf.Ticker(self._symbol)  # session=session)
+            info = stock.info
+
+            price = float(info["currentPrice"])
+            options = stock.options
+            sector = info["sector"]
+            industry = info["industry"]
+            vol_aver_10days = info["averageDailyVolume10Day"]
+            vol_aver_3months = info["averageDailyVolume3Month"]
+
+            try:
+                beta = info["beta"]
+            except Exception as e:
+                pass
+
+        except Exception as e:
+            return {}, None, {}, None, None, None, None, None
+
+        return stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months
 
 

@@ -1,5 +1,4 @@
 import yfinance as yf
-from numba import njit
 import numpy as np
 import requests_cache
 
