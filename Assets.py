@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import functions
 
+
 class Asset(object):
     # constructor
     def __init__(self, symbol: str):
@@ -92,12 +93,13 @@ class Equity(Asset):
             last_price = round(close_prices.iloc[-1][self._symbol], 2)
             first_price = round(close_prices.iloc[0][self._symbol], 2)
             price_trend = functions.get_price_trend(close_prices)
+            abs_sd, rel_sd = functions.get_std_dev(self._symbol, close_prices)
 
         except Exception as e:
             print(f"Download failed: {e}")
-            return [-1, -1, -1, -1, -1, -1, -1, -1]
+            return [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
 
-        return [low, high, first_price, last_price, avg_price, avg_price_7d, avg_price_30d, price_trend]
+        return [low, high, first_price, last_price, avg_price, avg_price_7d, avg_price_30d, price_trend, abs_sd, rel_sd]
 
 
 

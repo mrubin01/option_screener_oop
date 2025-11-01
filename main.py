@@ -4,7 +4,7 @@ import functions
 import warnings
 import pandas as pd
 import Assets
-
+import yfinance as yf
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -31,6 +31,7 @@ YEAR, MONTH, DAY = 2025, 11, [21, 28]
 ticker_list = ["AAPL", ""]
 tickers_with_options = []
 
+
 if STOCK_EXCHANGE in [0, 1]:
     for t in ticker_list:
         ticker = Assets.Equity(t, EXCHANGES[1])
@@ -43,7 +44,8 @@ if STOCK_EXCHANGE in [0, 1]:
             lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
             avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
             trend = price_data[7]
-            print(trend)
+            abs_std_deviation, rel_std_deviation = price_data[8], price_data[9]
+
 
 elif STOCK_EXCHANGE == 2:
     pass
