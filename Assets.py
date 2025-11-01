@@ -47,8 +47,7 @@ class Equity(Asset):
             print("Invalid exchange! It must be a string")
 
     def get_info(self):
-        """ Call Yahoo Finance API and store data into a dict
-            If info is empty, call the api with no user-agent """
+        """ Call Yahoo Finance API and store data into a dict """
         beta = "N/A"
 
         try:
@@ -71,5 +70,31 @@ class Equity(Asset):
             return {}, None, {}, None, None, None, None, None
 
         return stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months
+
+    def get_high_low_price(self):
+        """
+        It downloads the Close price in the past 3 months and computes
+        the highest, lowest prices and the averages
+        :param: none
+        :return:
+        """
+        try:
+            data = yf.download(self._symbol, period='3mo', group_by='column')
+            if data.empty:
+                raise ValueError("No data returned for ticker")
+            close_prices = data['Close']
+            lowest = round(close_prices.min()[self._symbol], 2)
+            highest = round(close_prices.max()[self._symbol], 2)
+            avg_close_price = round(close_prices.mean()[self._symbol], 2)
+            avg_close_price_7d = round(close_prices.tail(7).mean()[self._symbol], 2)
+            avg_close_price_30d = round(close_prices.tail(30).mean()[self._symbol], 2)
+            last_close_price = round(close_prices.iloc[-1][self._symbol], 2)
+            first_close_price = round(close_prices.iloc[0][self._symbol], 2)
+
+        except Exception as e:
+            print(f"Download failed: {e}")
+            return [-1, -1, -1, -1, -1, -1, -1]
+
+        return [lowest, highest, first_close_price, last_close_price, avg_close_price, avg_close_price_7d, avg_close_price_30d]
 
 
