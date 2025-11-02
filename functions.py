@@ -59,21 +59,15 @@ def get_vix():
     current_vix = info["regularMarketPrice"]
 
     if current_vix < 15:
-        print(f"Volatility index VIX is {current_vix} --> LOW")
-        print("------ ------")
+        print(f"|-- Volatility index VIX is {current_vix} --> LOW --|")
     elif 15 <= current_vix < 20:
-        print(f"Volatility index VIX is {current_vix} --> MODERATE")
-        print("------ ------")
+        print(f"|-- Volatility index VIX is {current_vix} --> MODERATE --|")
     elif 20 <= current_vix < 30:
-        print(f"Be careful! Volatility index VIX is {current_vix} --> HIGH")
-        print("------ ------")
+        print(f"|-- Be careful! Volatility index VIX is {current_vix} --> HIGH --|")
     elif 30 <= current_vix < 80:
-        print(f"Be careful! Volatility index VIX is {current_vix} --> VERY HIGH")
-        print("------ ------")
+        print(f"|-- Be careful! Volatility index VIX is {current_vix} --> VERY HIGH --|")
     elif current_vix >= 80:
-        print(f"Be careful! Volatility index VIX is {current_vix} --> EXTREMELY HIGH")
-        print("------ ------")
-
+        print(f"|-- Be careful! Volatility index VIX is {current_vix} --> EXTREMELY HIGH --|")
 
 
 def write_tickers_to_file(tickers: list, filename: str):
