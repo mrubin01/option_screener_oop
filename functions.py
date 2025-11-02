@@ -15,9 +15,11 @@ def get_std_dev(ticker: str, price_list: list) -> list:
         std_dev = price_list.std()
         abs_std_dev = std_dev[ticker]
 
-        last_close_price = price_list.iloc[-1][ticker]
+        # last_close_price = price_list.iloc[-1][ticker]
+        avg_close_price = price_list.mean()[ticker]
 
-        rel_std_dev = (abs_std_dev / last_close_price) * 100
+        # rel_std_dev = (abs_std_dev / last_close_price) * 100
+        rel_std_dev = (abs_std_dev / avg_close_price) * 100
 
         return [round(abs_std_dev, 2), round(rel_std_dev, 2)]
     except Exception as e:

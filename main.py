@@ -46,7 +46,11 @@ if STOCK_EXCHANGE in [0, 1]:
             lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
             avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
             trend = price_data[7]
+            # rel_std_deviation aka coefficient of variation: rel_std < 2 LOW, rel_std < 5 MODERATE, rel_std >= 5 HIGH, >= 10 VERY HIGH
             abs_std_deviation, rel_std_deviation = price_data[8], price_data[9]
+
+            print(avg_price, abs_std_deviation, rel_std_deviation)
+
             lowest_decrease = round((lowest_price / price) * 100, 2)
             highest_increase = round((highest_price / price) * 100, 2)
 
@@ -89,7 +93,7 @@ if STOCK_EXCHANGE in [0, 1]:
                                                                                 cc_impl_volatility[i], ratio_bid_price, sector, industry,
                                                                                 highest_price, avg_price, lowest_price, beta]
 
-                                        print(best_contracts_dict.values())
+                                        print(f"Match: {cc_contract[i]}")
 
                                 elif TREND == 1:
                                     pass
