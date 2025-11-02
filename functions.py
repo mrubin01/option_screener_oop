@@ -52,10 +52,44 @@ def get_vix():
     """"
     It checks for the volatility index VIX
     :param none
-    :return: float
+    :return: none
     """
     data = yf.Ticker("^VIX")
     info = data.info
-    current = info["regularMarketPrice"]
+    current_vix = info["regularMarketPrice"]
 
-    return round(float(current), 2)
+    if current_vix < 15:
+        print(f"Volatility index VIX is {current_vix} --> LOW")
+        print("------ ------")
+    elif 15 <= current_vix < 20:
+        print(f"Volatility index VIX is {current_vix} --> MODERATE")
+        print("------ ------")
+    elif 20 <= current_vix < 30:
+        print(f"Be careful! Volatility index VIX is {current_vix} --> HIGH")
+        print("------ ------")
+    elif 30 <= current_vix < 80:
+        print(f"Be careful! Volatility index VIX is {current_vix} --> VERY HIGH")
+        print("------ ------")
+    elif current_vix >= 80:
+        print(f"Be careful! Volatility index VIX is {current_vix} --> EXTREMELY HIGH")
+        print("------ ------")
+
+
+
+def write_tickers_to_file(tickers: list, filename: str):
+    """
+    Writes a list of tickers to a TXT file, one ticker per line
+    :param tickers: a list of tickers
+    :param filename: Output filename, e.g. 'tickers.txt'
+    :return: none
+    """
+    if not filename.endswith(('.txt', '.csv')):
+        raise ValueError("Filename must end with .txt or .csv")
+
+    try:
+        with open(filename, 'w') as f:
+            for ticker in tickers:
+                f.write(f"{ticker}\n")
+    except Exception as e:
+        print(f"Failed to write file: {e}")
+
