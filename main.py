@@ -25,7 +25,7 @@ functions.get_vix()
 
 # main global variables
 TYPE = 0  # 0 call, 1 put, 2 spread
-STOCK_EXCHANGE = 1  # nyse, nasdaq, arca
+STOCK_EXCHANGE = 0  # nyse, nasdaq, arca
 TREND = 1  # -1 no trend, 0 downtrend, 1 uptrend
 MAX_STOCK_PRICE = 1000
 YEAR, MONTH, DAY = 2025, 11, [7, 14]
