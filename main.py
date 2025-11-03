@@ -6,7 +6,6 @@ import pandas as pd
 from datetime import datetime
 import csv
 import Assets
-import yfinance as yf
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -26,9 +25,10 @@ functions.get_vix()
 # main global variables
 TYPE = 0  # 0 call, 1 put, 2 spread
 STOCK_EXCHANGE = 0  # nyse, nasdaq, arca
-TREND = 1  # -1 no trend, 0 downtrend, 1 uptrend
+TREND = -1  # -1 no trend, 0 downtrend, 1 uptrend
 MAX_STOCK_PRICE = 1000
 YEAR, MONTH, DAY = 2025, 11, [7, 14]
+STD_DEV_THRESHOLD = 10
 
 OPTION_TYPE = ["Call", "Put", "Spread"]
 EXCHANGES = ["NYSE", "NASDAQ", "ARCA"]
@@ -119,7 +119,7 @@ if STOCK_EXCHANGE in [0, 1]:
                                     if cc_bid[i] >= MIN_BID_PRICE \
                                             and cc_strike[i] > price \
                                             and price_vs_avgs == 0 \
-                                            and rel_std_deviation < 10 \
+                                            and rel_std_deviation < STD_DEV_THRESHOLD \
                                             and trend == 0:
                                         if t not in best_tickers_with_options:
                                             best_tickers_with_options.append(t)
@@ -130,11 +130,11 @@ if STOCK_EXCHANGE in [0, 1]:
                                                                                 cc_impl_volatility[i], ratio_bid_price, sector, industry,
                                                                                 highest_price, avg_price, lowest_price, beta]
                                 # stocks with uptrend
-                                if TREND == 1:
+                                elif TREND == 1:
                                     if cc_bid[i] >= MIN_BID_PRICE \
                                             and cc_strike[i] > price \
                                             and price_vs_avgs == 1 \
-                                            and rel_std_deviation < 10 \
+                                            and rel_std_deviation < STD_DEV_THRESHOLD \
                                             and trend == 1:
                                         if t not in best_tickers_with_options:
                                             best_tickers_with_options.append(t)
@@ -146,10 +146,22 @@ if STOCK_EXCHANGE in [0, 1]:
                                                                                 highest_price, avg_price, lowest_price, beta]
 
                                         print(f"Match: {cc_contract[i]}")
+                                                                # stocks with uptrend
+                                # no trend
+                                elif TREND == -1:
+                                    if cc_bid[i] >= MIN_BID_PRICE \
+                                            and cc_strike[i] > price \
+                                            and rel_std_deviation < STD_DEV_THRESHOLD:
+                                        if t not in best_tickers_with_options:
+                                            best_tickers_with_options.append(t)
 
-                                elif TREND == 1:
-                                    pass
+                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                cc_impl_volatility[i], ratio_bid_price, sector, industry,
+                                                                                highest_price, avg_price, lowest_price, beta]
 
+                                        print(f"Match: {cc_contract[i]}")
 
                     except Exception as e:
                         continue
@@ -166,17 +178,17 @@ elif STOCK_EXCHANGE == 2:
     pass
 
 # sort by ratio_bid_strike
-if STOCK_EXCHANGE in [1, 2]:
+if STOCK_EXCHANGE in [0, 1]:
     sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-7], reverse=True)
-elif STOCK_EXCHANGE == 3:
+elif STOCK_EXCHANGE == 2:
     sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-4], reverse=True)
 
 # all tickers with active options
-if WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 1:
+if WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 0:
     functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nyse.txt")
-elif WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 2:
+elif WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 1:
     functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nasdaq.txt")
-elif WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 3:
+elif WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 2:
     functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_arca.txt")
 
 # only the best cov calls
