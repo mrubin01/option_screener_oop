@@ -2,6 +2,7 @@ import yfinance as yf
 import numpy as np
 import requests_cache
 from sklearn.linear_model import LinearRegression
+import csv
 
 
 def get_std_dev(ticker: str, price_list: list) -> list:
@@ -86,4 +87,29 @@ def write_tickers_to_file(tickers: list, filename: str):
                 f.write(f"{ticker}\n")
     except Exception as e:
         print(f"Failed to write file: {e}")
+
+
+def write_best_option_to_file(path: str, exchange: int, sorted_option_list: list):
+    """
+    Write a list of option into a directory as a csv file
+    :param path: a string with the path
+    :param exchange: 0 NYSE, 1 NASDAQ, 2, ARCA
+    :param sorted_option_list: a lsit with the best options
+    :return: none
+    """
+    if exchange in [0, 1]:
+        with open(path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])
+            for row in sorted_option_list:
+                writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
+    elif exchange == 2:
+        with open(path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "highest", "avg price", "lowest", "trend"])
+            for row in sorted_option_list:
+                writer.writerow([row[0], row[1], row[3], row[6], row[-8], row[-5], row[-4], row[-3], row[-2], row[-1]])
+    else:
+        print("Impossible to write options to file! Wrong exchange number")
+
 
