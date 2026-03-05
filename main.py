@@ -6,6 +6,8 @@ import pandas as pd
 from datetime import datetime
 import csv
 import Assets
+import config
+import spread_options_short_calls
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -17,8 +19,6 @@ user_agent = functions.create_user_agent()
 CLEAR_CACHE = False
 if CLEAR_CACHE:
     user_agent.cache.clear()
-
-start_time = time.time()
 
 # Market indexes
 ftse_5d = functions.get_index_change_last5d("^FTSE", "5d")
@@ -36,28 +36,28 @@ elif dow_jones_5d < 0:
     print(f"|-- WARNING: Index DOW JONES is {dow_jones_5d}% lower than the last 5 days --|")
 
 if ftse_1m < 0 and dow_jones_1m:
-    print(f"WARNING: FTSE100 ({ftse_1m}) and DOW JONES ({dow_jones_1m}) are also lower than 30 days ago!!!")
+    print(f"|-- WARNING: FTSE100 ({ftse_1m}) and DOW JONES ({dow_jones_1m}) are lower than 30 days ago!!! --|")
 
 print("|--------------------------------------------------------------------------|")
 
-# main global variables
-TYPE = 2  # 0 call, 1 put, 2 spread
-STOCK_EXCHANGE = 2  # nyse, nasdaq, arca
-TREND = -1  # -1 no trend, 0 downtrend, 1 uptrend
-MAX_STOCK_PRICE = 250
-YEAR, MONTH, DAY = 2026, [2], [6, 13, 20, 27]  # 2025, [11], [14]  #
-STD_DEV_THRESHOLD = 15
-SCOPE = 0  # 0 only tickers with options, 1 whole ticker list
-WRITE_TICKERS_TO_FILE = 1
+test = config.TEST
+option_no = config.TYPE  # 0 call, 1 put, 2 spread
+stock_exchange = config.STOCK_EXCHANGE
+trend_no = config.TREND
+max_stock_price = config.MAX_STOCK_PRICE
+i_year, l_month, l_day = config.YEAR, config.MONTH, config.DAY
+std_dev_threshold = config.STD_DEV_THRESHOLD
+scope = config.SCOPE
+write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
 
-OPTION_TYPE = ["Call", "Put", "Spread"]
-EXCHANGES = ["NYSE", "NASDAQ", "ARCA"]
-MIN_BID_PRICE = 0.2
-TREND_TYPE = ["downtrend", "uptrend", "no trend"]
-HAVE_OPTIONS = 0  # 0 no active options, 1 with active options
+option_type = config.OPTION_TYPE
+exchanges = config.EXCHANGES
+min_bid_price = config.MIN_BID_PRICE
+trend_type = config.TREND_TYPE
+have_options = config.HAVE_OPTIONS
 
 
-match (STOCK_EXCHANGE, SCOPE):
+match (stock_exchange, scope):
     case (0, 0):
         my_file = open("/Users/madararubino/stocks_with_options_nyse.txt", "r")
     case (1, 0):
@@ -77,211 +77,26 @@ match (STOCK_EXCHANGE, SCOPE):
 data = my_file.read()
 data_into_list = data.replace('\n', ', ').split(", ")
 ticker_list = list(filter(None, data_into_list))
+# ticker_list = ["TNA", "BOIL", "KOLD", "SOXL", "IWM", "GDX", "SILJ"]
+# ticker_list = ["COMM", "CORZ", "CZR", "DJT", "LCID", "LYFT"]
 
 tickers_with_options = []
 best_tickers_with_options = []
 best_contracts_dict = {}
 
-if STOCK_EXCHANGE in [0, 1]:
-    print(f"|-- Scanning {OPTION_TYPE[TYPE]} options in {EXCHANGES[STOCK_EXCHANGE]} with {TREND_TYPE[TREND]}... --|")
-    print()
-    for t in ticker_list:
-        ticker = Assets.Equity(t, EXCHANGES[STOCK_EXCHANGE])
-        stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months = ticker.get_info()
-        if len(options) > 0 and price <= MAX_STOCK_PRICE:
-            if t not in tickers_with_options:
-                tickers_with_options.append(t)
 
-            price_data = ticker.get_high_low_price()
-            lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
-            avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
-            trend = price_data[7]
-            # rel_std_deviation aka coefficient of variation: rel_std < 2 LOW, rel_std < 5 MODERATE, rel_std >= 5 HIGH, >= 10 VERY HIGH
-            abs_std_deviation, rel_std_deviation = price_data[8], price_data[9]
-            print(f"rel std dev for {t}: {rel_std_deviation}")
+def main():
+    start_time = time.time()
+    if stock_exchange in [0, 1] and not test:
+        print(f"|-- Scanning {option_type[option_no]} options in {exchanges[stock_exchange]} with {trend_type[trend_no]}... --|")
+        print()
+        for t in ticker_list:
+            ticker = Assets.Equity(t, exchanges[stock_exchange])
+            stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months = ticker.get_info()
+            if len(options) > 0 and price <= max_stock_price:
+                if t not in tickers_with_options:
+                    tickers_with_options.append(t)
 
-            lowest_decrease = round((lowest_price / price) * 100, 2)
-            highest_increase = round((highest_price / price) * 100, 2)
-
-            for d in options:
-                new_date = datetime.strptime(d, "%Y-%m-%d")
-                day = new_date.day
-                month = new_date.month
-                year = new_date.year
-
-                # covered calls
-                if year == YEAR and month in MONTH and day in DAY and TYPE == 0:
-                    try:
-                        cc = stock.option_chain(d).calls
-
-                        if cc is not None:
-                            cc_contract = cc["contractSymbol"]
-                            cc_strike = cc["strike"]
-                            cc_bid = cc["bid"]
-                            cc_ask = cc["ask"]
-                            cc_vol = cc["volume"]
-                            cc_open_interest = cc["openInterest"]
-                            cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
-
-                            for i in range(len(cc_contract)):
-                                spread_bid_ask = round(cc_ask[i] - cc_bid[i], 2)
-                                spread_strike_price = round(cc_strike[i] - price, 2)
-                                delta_price_premium = round(cc_strike[i] - price + cc_bid[i], 2)
-                                ratio_bid_strike = round((cc_bid[i] / cc_strike[i]) * 100, 2)
-                                price_vs_avgs = -1
-                                if price < avg_price and price < avg_price_7d and price < avg_price_30d:
-                                    price_vs_avgs = 0  # price is lower than the averages
-                                if price > avg_price and price > avg_price_7d and price > avg_price_30d:
-                                    price_vs_avgs = 1  # price is higher than the averages
-
-                                # stocks with downtrend
-                                if TREND == 0:
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] > price \
-                                            and price_vs_avgs == 0 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 0:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
-
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_bid_strike, sector, industry,
-                                                                                highest_price, avg_price, lowest_price, beta]
-                                # stocks with uptrend
-                                elif TREND == 1:
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] > price \
-                                            and price_vs_avgs == 1 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 1:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
-
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_bid_strike, sector, industry,
-                                                                                highest_price, avg_price, lowest_price, beta]
-
-                                        print(f"Match: {cc_contract[i]}")
-                                # no trend
-                                elif TREND == -1:
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] > price \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
-
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_bid_strike, sector, industry,
-                                                                                highest_price, avg_price, lowest_price, beta]
-
-                                        print(f"Match: {cc_contract[i]}")
-
-                    except Exception as e:
-                        continue
-
-                # put options
-                elif year == YEAR and month in MONTH and day in DAY and TYPE == 1:
-                    try:
-                        put = stock.option_chain(d).puts
-
-                        if put is not None:
-                            p_contract = put["contractSymbol"]
-                            p_strike = put["strike"]
-                            p_bid = put["bid"]
-                            p_ask = put["ask"]
-                            p_vol = put["volume"]
-                            p_open_interest = put["openInterest"]
-                            p_impl_volatility = round(put["impliedVolatility"] * 100, 2)
-
-                            for i in range(len(p_contract)):
-                                spread_bid_ask = round(p_ask[i] - p_bid[i], 2)
-                                spread_strike_price = round(p_strike[i] - price, 2)
-                                delta_price_premium = round(p_strike[i] - price + p_bid[i], 2)
-                                ratio_bid_strike = round((p_bid[i] / p_strike[i]) * 100, 2)
-                                price_vs_avgs = -1
-                                if price < avg_price and price < avg_price_7d and price < avg_price_30d:
-                                    price_vs_avgs = 0  # price is lower than the averages
-                                if price > avg_price and price > avg_price_7d and price > avg_price_30d:
-                                    price_vs_avgs = 1  # price is higher than the averages
-
-                                # stocks with downtrend
-                                if TREND == 0:
-                                    if p_bid[i] >= MIN_BID_PRICE \
-                                            and p_strike[i] < price \
-                                            and price_vs_avgs == 0 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 0:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
-
-                                        best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                              round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
-                                                                              round(float(p_bid[i] * 100), 2), p_open_interest[i],
-                                                                              p_impl_volatility[i], ratio_bid_strike, sector, industry,
-                                                                              highest_price, avg_price, lowest_price, beta]
-                                        print(f"Match: {p_contract[i]}")
-                                # stocks with uptrend
-                                elif TREND == 1:
-                                    if p_bid[i] >= MIN_BID_PRICE \
-                                            and p_strike[i] < price \
-                                            and price_vs_avgs == 1 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 1:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
-
-                                        best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
-                                                                                round(float(p_bid[i] * 100), 2), p_open_interest[i],
-                                                                                p_impl_volatility[i], ratio_bid_strike, sector, industry,
-                                                                                highest_price, avg_price, lowest_price, beta]
-                                        print(f"Match: {p_contract[i]}")
-                                # stocks with no trend
-                                elif TREND == -1:
-                                    if p_bid[i] >= MIN_BID_PRICE \
-                                            and p_strike[i] < price \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
-
-                                        best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
-                                                                                round(float(p_bid[i] * 100), 2), p_open_interest[i],
-                                                                                p_impl_volatility[i], ratio_bid_strike, sector, industry,
-                                                                                highest_price, avg_price, lowest_price, beta]
-
-                                        print(f"Match: {p_contract[i]}")
-
-                    except Exception as e:
-                        continue
-
-                # spreads
-                elif year == YEAR and month in MONTH and day in DAY and TYPE == 2:
-                    pass
-
-        else:
-            pass
-
-# ARCA
-elif STOCK_EXCHANGE == 2:
-    print(f"|-- Scanning {OPTION_TYPE[TYPE]} options in {EXCHANGES[STOCK_EXCHANGE]} with {TREND_TYPE[TREND]}... --|")
-    print()
-    for t in ticker_list:
-        print(t)
-        ticker = Assets.ETF(t, EXCHANGES[STOCK_EXCHANGE])
-        stock, price, options, vol_aver_10days, vol_aver_3months = ticker.get_info_etf()
-        # ARCA - spread options: len(options) >= 10 is used to filter only stocks with weekly options
-        if len(options) >= 8 and price <= MAX_STOCK_PRICE:
-            if t not in tickers_with_options:
-                tickers_with_options.append(t)
-
-            try:
                 price_data = ticker.get_high_low_price()
                 lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
                 avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
@@ -289,374 +104,513 @@ elif STOCK_EXCHANGE == 2:
                 # rel_std_deviation aka coefficient of variation: rel_std < 2 LOW, rel_std < 5 MODERATE, rel_std >= 5 HIGH, >= 10 VERY HIGH
                 abs_std_deviation, rel_std_deviation = price_data[8], price_data[9]
                 print(f"rel std dev for {t}: {rel_std_deviation}")
+
                 lowest_decrease = round((lowest_price / price) * 100, 2)
                 highest_increase = round((highest_price / price) * 100, 2)
-            except Exception as e:
-                continue
 
-            for d in options:
-                new_date = datetime.strptime(d, "%Y-%m-%d")
-                day = new_date.day
-                month = new_date.month
-                year = new_date.year
+                for d in options:
+                    new_date = datetime.strptime(d, "%Y-%m-%d")
+                    day = new_date.day
+                    month = new_date.month
+                    year = new_date.year
 
-                # ARCA - spread options
-                if year == YEAR and month in MONTH and day in DAY and TYPE == 2:
-                    try:
-                        cc = stock.option_chain(d).calls
+                    # covered calls
+                    if year == i_year and month in l_month and day in l_day and option_no == 0:
+                        try:
+                            cc = stock.option_chain(d).calls
 
-                        if cc is not None:
-                            cc_contract = cc["contractSymbol"]
-                            cc_strike = cc["strike"]
-                            cc_bid = cc["bid"]
-                            cc_ask = cc["ask"]
-                            cc_vol = cc["volume"]
-                            cc_open_interest = cc["openInterest"]
-                            cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
+                            if cc is not None:
+                                cc_contract = cc["contractSymbol"]
+                                cc_strike = cc["strike"]
+                                cc_bid = cc["bid"]
+                                cc_ask = cc["ask"]
+                                cc_vol = cc["volume"]
+                                cc_open_interest = cc["openInterest"]
+                                cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
 
-                            for i in range(len(cc_contract)):
-                                spread_bid_ask = round(cc_ask[i] - cc_bid[i], 2)
-                                spread_strike_price = round(cc_strike[i] - price, 2)
-                                delta_price_premium = round(cc_strike[i] - price + cc_bid[i], 2)
-                                ratio_bid_strike = round((cc_bid[i] / cc_strike[i]) * 100, 2)
-                                # for spreads usually you buy a call, then the ask price is used
-                                ratio_ask_strike = round((cc_ask[i] / cc_strike[i]) * 100, 2)
+                                for i in range(len(cc_contract)):
+                                    spread_bid_ask = round(cc_ask[i] - cc_bid[i], 2)
+                                    spread_strike_price = round(cc_strike[i] - price, 2)
+                                    delta_price_premium = round(cc_strike[i] - price + cc_bid[i], 2)
+                                    ratio_bid_strike = round((cc_bid[i] / cc_strike[i]) * 100, 2)
+                                    price_vs_avgs = -1
+                                    if price < avg_price and price < avg_price_7d and price < avg_price_30d:
+                                        price_vs_avgs = 0  # price is lower than the averages
+                                    if price > avg_price and price > avg_price_7d and price > avg_price_30d:
+                                        price_vs_avgs = 1  # price is higher than the averages
 
-                                price_vs_avgs = -1
-                                if price < avg_price and price < avg_price_7d and price < avg_price_30d:
-                                    price_vs_avgs = 0  # price is lower than the averages
-                                if price > avg_price and price > avg_price_7d and price > avg_price_30d:
-                                    price_vs_avgs = 1  # price is higher than the averages
+                                    # stocks with downtrend
+                                    if trend_no == 0:
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] > price \
+                                                and price_vs_avgs == 0 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 0:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
 
-                                # stocks with downtrend
-                                if TREND == 0:
-                                    # for spreads the contract must be deep In The Money strike price < price
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] < price \
-                                            and price_vs_avgs == 0 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 0:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_bid_strike, sector, industry,
+                                                                                    highest_price, avg_price, lowest_price, beta]
+                                    # stocks with uptrend
+                                    elif trend_no == 1:
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] > price \
+                                                and price_vs_avgs == 1 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 1:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
 
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_ask_strike, # ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {cc_contract[i]}; ratio: {ratio_ask_strike}")
-                                # stocks with uptrend
-                                if TREND == 1:
-                                    # for spreads the contract must be deep In The Money strike price < price
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] < price \
-                                            and price_vs_avgs == 1 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 1:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_bid_strike, sector, industry,
+                                                                                    highest_price, avg_price, lowest_price, beta]
 
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_ask_strike, # ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {cc_contract[i]}; ratio: {ratio_ask_strike}")
-                                # no trend
-                                elif TREND == -1:
+                                            print(f"Match: {cc_contract[i]}")
+                                    # no trend
+                                    elif trend_no == -1:
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] > price \
+                                                and rel_std_deviation < std_dev_threshold:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
 
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] < price \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                               round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                               cc_impl_volatility[i], ratio_ask_strike,  # ratio_bid_strike,
-                                                                               highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {cc_contract[i]}; ratio: {ratio_ask_strike}")
-                    except Exception as e:
-                        continue
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_bid_strike, sector, industry,
+                                                                                    highest_price, avg_price, lowest_price, beta]
 
-                # ARCA - cov calls
-                elif year == YEAR and month in MONTH and day in DAY and TYPE == 0:
-                    try:
-                        cc = stock.option_chain(d).calls
+                                            print(f"Match: {cc_contract[i]}")
 
-                        if cc is not None:
-                            cc_contract = cc["contractSymbol"]
-                            cc_strike = cc["strike"]
-                            cc_bid = cc["bid"]
-                            cc_ask = cc["ask"]
-                            cc_vol = cc["volume"]
-                            cc_open_interest = cc["openInterest"]
-                            cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
+                        except Exception as e:
+                            continue
 
-                            for i in range(len(cc_contract)):
-                                spread_bid_ask = round(cc_ask[i] - cc_bid[i], 2)
-                                spread_strike_price = round(cc_strike[i] - price, 2)
-                                delta_price_premium = round(cc_strike[i] - price + cc_bid[i], 2)
-                                # for cov calls usually you sell a call, then the bid price is used
-                                ratio_bid_strike = round((cc_bid[i] / cc_strike[i]) * 100, 2)
+                    # put options
+                    elif year == i_year and month in l_month and day in l_day and option_no == 1:
+                        try:
+                            put = stock.option_chain(d).puts
 
-                                price_vs_avgs = -1
-                                if price < avg_price and price < avg_price_7d and price < avg_price_30d:
-                                    price_vs_avgs = 0  # price is lower than the averages
-                                if price > avg_price and price > avg_price_7d and price > avg_price_30d:
-                                    price_vs_avgs = 1  # price is higher than the averages
+                            if put is not None:
+                                p_contract = put["contractSymbol"]
+                                p_strike = put["strike"]
+                                p_bid = put["bid"]
+                                p_ask = put["ask"]
+                                p_vol = put["volume"]
+                                p_open_interest = put["openInterest"]
+                                p_impl_volatility = round(put["impliedVolatility"] * 100, 2)
 
-                                # ARCA - cov calls - stocks with downtrend
-                                if TREND == 0:
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] > price \
-                                            and price_vs_avgs == 0 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 0:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                                for i in range(len(p_contract)):
+                                    spread_bid_ask = round(p_ask[i] - p_bid[i], 2)
+                                    spread_strike_price = round(p_strike[i] - price, 2)
+                                    delta_price_premium = round(p_strike[i] - price + p_bid[i], 2)
+                                    ratio_bid_strike = round((p_bid[i] / p_strike[i]) * 100, 2)
+                                    price_vs_avgs = -1
+                                    if price < avg_price and price < avg_price_7d and price < avg_price_30d:
+                                        price_vs_avgs = 0  # price is lower than the averages
+                                    if price > avg_price and price > avg_price_7d and price > avg_price_30d:
+                                        price_vs_avgs = 1  # price is higher than the averages
 
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_bid_strike, # ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {cc_contract[i]}; ratio: {ratio_bid_strike}")
+                                    # stocks with downtrend
+                                    if trend_no == 0:
+                                        if p_bid[i] >= min_bid_price \
+                                                and p_strike[i] < price \
+                                                and price_vs_avgs == 0 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 0:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
 
-                                # ARCA - cov calls - stocks with uptrend
-                                elif TREND == 1:
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] > price \
-                                            and price_vs_avgs == 0 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 0:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                                            best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                  round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
+                                                                                  round(float(p_bid[i] * 100), 2), p_open_interest[i],
+                                                                                  p_impl_volatility[i], ratio_bid_strike, sector, industry,
+                                                                                  highest_price, avg_price, lowest_price, beta]
+                                            print(f"Match: {p_contract[i]}")
+                                    # stocks with uptrend
+                                    elif trend_no == 1:
+                                        if p_bid[i] >= min_bid_price \
+                                                and p_strike[i] < price \
+                                                and price_vs_avgs == 1 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 1:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
 
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_bid_strike, # ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {cc_contract[i]}; ratio: {ratio_bid_strike}")
+                                            best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
+                                                                                    round(float(p_bid[i] * 100), 2), p_open_interest[i],
+                                                                                    p_impl_volatility[i], ratio_bid_strike, sector, industry,
+                                                                                    highest_price, avg_price, lowest_price, beta]
+                                            print(f"Match: {p_contract[i]}")
+                                    # stocks with no trend
+                                    elif trend_no == -1:
+                                        if p_bid[i] >= min_bid_price \
+                                                and p_strike[i] < price \
+                                                and rel_std_deviation < std_dev_threshold:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
 
-                                # ARCA - cov calls - stocks with no trend
-                                elif TREND == -1:
-                                    if cc_bid[i] >= MIN_BID_PRICE \
-                                            and cc_strike[i] > price \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                                            best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
+                                                                                    round(float(p_bid[i] * 100), 2), p_open_interest[i],
+                                                                                    p_impl_volatility[i], ratio_bid_strike, sector, industry,
+                                                                                    highest_price, avg_price, lowest_price, beta]
 
-                                        best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
-                                                                                round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
-                                                                                cc_impl_volatility[i], ratio_bid_strike, # ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {cc_contract[i]}; ratio: {ratio_bid_strike}")
+                                            print(f"Match: {p_contract[i]}")
 
-                    except Exception as e:
-                        continue
+                        except Exception as e:
+                            continue
 
-                # ARCA - put options
-                elif year == YEAR and month in MONTH and day in DAY and TYPE == 1:
-                    try:
-                        put = stock.option_chain(d).puts
+                    # spreads
+                    elif year == i_year and month in l_month and day in l_day and option_no == 2:
+                        pass
 
-                        if put is not None:
-                            p_contract = put["contractSymbol"]
-                            p_strike = put["strike"]
-                            p_bid = put["bid"]
-                            p_ask = put["ask"]
-                            p_vol = put["volume"]
-                            p_open_interest = put["openInterest"]
-                            p_impl_volatility = round(put["impliedVolatility"] * 100, 2)
+            else:
+                pass
 
-                            for i in range(len(p_contract)):
-                                spread_bid_ask = round(p_ask[i] - p_bid[i], 2)
-                                spread_strike_price = round(p_strike[i] - price, 2)
-                                delta_price_premium = round(p_strike[i] - price + p_bid[i], 2)
-                                # for puts usually you sell, then the bid price is used
-                                ratio_bid_strike = round((p_bid[i] / p_strike[i]) * 100, 2)
+    # ARCA
+    elif stock_exchange == 2 and not test:
+        print(f"|-- Scanning {option_type[option_no]} options in {exchanges[stock_exchange]} with {trend_type[trend_no]}... --|")
+        print()
+        for t in ticker_list:
+            print(t)
+            ticker = Assets.ETF(t, exchanges[stock_exchange])
+            stock, price, options, vol_aver_10days, vol_aver_3months = ticker.get_info_etf()
+            # ARCA - spread options: len(options) >= 10 is used to filter only stocks with weekly options
+            if len(options) >= 15 and price <= max_stock_price:
+                if t not in tickers_with_options:
+                    tickers_with_options.append(t)
 
-                                price_vs_avgs = -1
-                                if price < avg_price and price < avg_price_7d and price < avg_price_30d:
-                                    price_vs_avgs = 0  # price is lower than the averages
-                                if price > avg_price and price > avg_price_7d and price > avg_price_30d:
-                                    price_vs_avgs = 1  # price is higher than the averages
+                try:
+                    price_data = ticker.get_high_low_price()
+                    lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
+                    avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
+                    trend = price_data[7]
+                    # rel_std_deviation aka coefficient of variation: rel_std < 2 LOW, rel_std < 5 MODERATE, rel_std >= 5 HIGH, >= 10 VERY HIGH
+                    abs_std_deviation, rel_std_deviation = price_data[8], price_data[9]
+                    lowest_decrease = round((lowest_price / price) * 100, 2)
+                    highest_increase = round((highest_price / price) * 100, 2)
+                except Exception as e:
+                    continue
 
-                                # ARCA - put options - stocks with downtrend
-                                if TREND == 0:
-                                    if p_bid[i] >= MIN_BID_PRICE \
-                                            and p_strike[i] < price \
-                                            and price_vs_avgs == 0 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 0:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                for d in options:
+                    new_date = datetime.strptime(d, "%Y-%m-%d")
+                    day = new_date.day
+                    month = new_date.month
+                    year = new_date.year
 
-                                        best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
-                                                                                round(float(p_bid[i] * 100), 2), p_open_interest[i],
-                                                                                p_impl_volatility[i], ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {p_contract[i]}; ratio: {ratio_bid_strike}")
-                                # ARCA - put options - stocks with uptrend
-                                elif TREND == 1:
-                                    if p_bid[i] >= MIN_BID_PRICE \
-                                            and p_strike[i] < price \
-                                            and price_vs_avgs == 1 \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD \
-                                            and trend == 1:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                    # ARCA - spread options
+                    if year == i_year and month in l_month and day in l_day and option_no == 2:
+                        try:
+                            cc = stock.option_chain(d).calls
 
-                                        best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
-                                                                                round(float(p_bid[i] * 100), 2), p_open_interest[i],
-                                                                                p_impl_volatility[i], ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {p_contract[i]}; ratio: {ratio_bid_strike}")
+                            if cc is not None:
+                                cc_contract = cc["contractSymbol"]
+                                cc_strike = cc["strike"]
+                                cc_bid = cc["bid"]
+                                cc_ask = cc["ask"]
+                                cc_vol = cc["volume"]
+                                cc_open_interest = cc["openInterest"]
+                                cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
 
-                                # ARCA - put options - stocks with no trend
-                                elif TREND == -1:
-                                    if p_bid[i] >= MIN_BID_PRICE \
-                                            and p_strike[i] < price \
-                                            and rel_std_deviation < STD_DEV_THRESHOLD:
-                                        if t not in best_tickers_with_options:
-                                            best_tickers_with_options.append(t)
+                                for i in range(len(cc_contract)):
+                                    spread_bid_ask = round(cc_ask[i] - cc_bid[i], 2)
+                                    spread_strike_price = round(cc_strike[i] - price, 2)
+                                    delta_price_premium = round(cc_strike[i] - price + cc_bid[i], 2)
+                                    ratio_bid_strike = round((cc_bid[i] / cc_strike[i]) * 100, 2)
+                                    # for spreads usually you buy a call, then the ask price is used
+                                    ratio_ask_strike = round((cc_ask[i] / cc_strike[i]) * 100, 2)
 
-                                        best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
-                                                                               round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
-                                                                                round(float(p_bid[i] * 100), 2), p_open_interest[i],
-                                                                                p_impl_volatility[i], ratio_bid_strike,
-                                                                                highest_price, avg_price, lowest_price, trend]
-                                        print(f"Match: {p_contract[i]}; ratio: {ratio_bid_strike}")
+                                    price_vs_avgs = -1
+                                    if price < avg_price and price < avg_price_7d and price < avg_price_30d:
+                                        price_vs_avgs = 0  # price is lower than the averages
+                                    if price > avg_price and price > avg_price_7d and price > avg_price_30d:
+                                        price_vs_avgs = 1  # price is higher than the averages
 
-                    except Exception as e:
-                        continue
+                                    # stocks with downtrend
+                                    if trend_no == 0:
+                                        # for spreads the contract must be deep In The Money strike price < price
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] < price \
+                                                and price_vs_avgs == 0 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 0:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_ask_strike, # ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {cc_contract[i]}; ratio: {ratio_ask_strike}")
+                                    # stocks with uptrend
+                                    if trend_no == 1:
+                                        # for spreads the contract must be deep In The Money strike price < price
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] < price \
+                                                and price_vs_avgs == 1 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 1:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_ask_strike, # ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {cc_contract[i]}; ratio: {ratio_ask_strike}")
+                                    # no trend
+                                    elif trend_no == -1:
+
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] < price \
+                                                and rel_std_deviation < std_dev_threshold:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                   round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                   cc_impl_volatility[i], ratio_ask_strike,  # ratio_bid_strike,
+                                                                                   highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {cc_contract[i]}; ratio: {ratio_ask_strike}")
+                        except Exception as e:
+                            continue
+
+                    # ARCA - cov calls
+                    elif year == i_year and month in l_month and day in l_day and option_no == 0:
+                        try:
+                            cc = stock.option_chain(d).calls
+
+                            if cc is not None:
+                                cc_contract = cc["contractSymbol"]
+                                cc_strike = cc["strike"]
+                                cc_bid = cc["bid"]
+                                cc_ask = cc["ask"]
+                                cc_vol = cc["volume"]
+                                cc_open_interest = cc["openInterest"]
+                                cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
+
+                                for i in range(len(cc_contract)):
+                                    spread_bid_ask = round(cc_ask[i] - cc_bid[i], 2)
+                                    spread_strike_price = round(cc_strike[i] - price, 2)
+                                    delta_price_premium = round(cc_strike[i] - price + cc_bid[i], 2)
+                                    # for cov calls usually you sell a call, then the bid price is used
+                                    ratio_bid_strike = round((cc_bid[i] / cc_strike[i]) * 100, 2)
+
+                                    price_vs_avgs = -1
+                                    if price < avg_price and price < avg_price_7d and price < avg_price_30d:
+                                        price_vs_avgs = 0  # price is lower than the averages
+                                    if price > avg_price and price > avg_price_7d and price > avg_price_30d:
+                                        price_vs_avgs = 1  # price is higher than the averages
+
+                                    # ARCA - cov calls - stocks with downtrend
+                                    if trend_no == 0:
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] > price \
+                                                and price_vs_avgs == 0 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 0:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_bid_strike, # ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {cc_contract[i]}; ratio: {ratio_bid_strike}")
+
+                                    # ARCA - cov calls - stocks with uptrend
+                                    elif trend_no == 1:
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] > price \
+                                                and price_vs_avgs == 0 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 0:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_bid_strike, # ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {cc_contract[i]}; ratio: {ratio_bid_strike}")
+
+                                    # ARCA - cov calls - stocks with no trend
+                                    elif trend_no == -1:
+                                        if cc_bid[i] >= min_bid_price \
+                                                and cc_strike[i] > price \
+                                                and rel_std_deviation < std_dev_threshold:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[cc_contract[i]] = [cc_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(cc_strike[i]), 2),
+                                                                                    round(float(cc_bid[i] * 100), 2), cc_open_interest[i],
+                                                                                    cc_impl_volatility[i], ratio_bid_strike, # ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {cc_contract[i]}; ratio: {ratio_bid_strike}")
+
+                        except Exception as e:
+                            continue
+
+                    # ARCA - put options
+                    elif year == i_year and month in l_month and day in l_day and option_no == 1:
+                        try:
+                            put = stock.option_chain(d).puts
+
+                            if put is not None:
+                                p_contract = put["contractSymbol"]
+                                p_strike = put["strike"]
+                                p_bid = put["bid"]
+                                p_ask = put["ask"]
+                                p_vol = put["volume"]
+                                p_open_interest = put["openInterest"]
+                                p_impl_volatility = round(put["impliedVolatility"] * 100, 2)
+
+                                for i in range(len(p_contract)):
+                                    spread_bid_ask = round(p_ask[i] - p_bid[i], 2)
+                                    spread_strike_price = round(p_strike[i] - price, 2)
+                                    delta_price_premium = round(p_strike[i] - price + p_bid[i], 2)
+                                    # for puts usually you sell, then the bid price is used
+                                    ratio_bid_strike = round((p_bid[i] / p_strike[i]) * 100, 2)
+
+                                    price_vs_avgs = -1
+                                    if price < avg_price and price < avg_price_7d and price < avg_price_30d:
+                                        price_vs_avgs = 0  # price is lower than the averages
+                                    if price > avg_price and price > avg_price_7d and price > avg_price_30d:
+                                        price_vs_avgs = 1  # price is higher than the averages
+
+                                    # ARCA - put options - stocks with downtrend
+                                    if trend_no == 0:
+                                        if p_bid[i] >= min_bid_price \
+                                                and p_strike[i] < price \
+                                                and price_vs_avgs == 0 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 0:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
+                                                                                    round(float(p_bid[i] * 100), 2), p_open_interest[i],
+                                                                                    p_impl_volatility[i], ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {p_contract[i]}; ratio: {ratio_bid_strike}")
+                                    # ARCA - put options - stocks with uptrend
+                                    elif trend_no == 1:
+                                        if p_bid[i] >= min_bid_price \
+                                                and p_strike[i] < price \
+                                                and price_vs_avgs == 1 \
+                                                and rel_std_deviation < std_dev_threshold \
+                                                and trend == 1:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
+                                                                                    round(float(p_bid[i] * 100), 2), p_open_interest[i],
+                                                                                    p_impl_volatility[i], ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {p_contract[i]}; ratio: {ratio_bid_strike}")
+
+                                    # ARCA - put options - stocks with no trend
+                                    elif trend_no == -1:
+                                        if p_bid[i] >= min_bid_price \
+                                                and p_strike[i] < price \
+                                                and rel_std_deviation < std_dev_threshold:
+                                            if t not in best_tickers_with_options:
+                                                best_tickers_with_options.append(t)
+
+                                            best_contracts_dict[p_contract[i]] = [p_contract[i], d, t, price, round(float(delta_price_premium), 2),
+                                                                                   round(float(spread_strike_price), 2), round(float(p_strike[i]), 2),
+                                                                                    round(float(p_bid[i] * 100), 2), p_open_interest[i],
+                                                                                    p_impl_volatility[i], ratio_bid_strike,
+                                                                                    highest_price, avg_price, lowest_price, trend]
+                                            print(f"Match: {p_contract[i]}; ratio: {ratio_bid_strike}")
+
+                        except Exception as e:
+                            continue
+
+    # TEST
+    elif stock_exchange == 2 and test:
+        spread_options_short_calls.run(i_year, l_month, l_day, 2, ticker_list)
+        sys.exit()
+
+    # sort by desc ratio_bid_strike
+    if stock_exchange in [0, 1] and not test:
+        sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-7], reverse=True)
+    elif stock_exchange == 2 and option_no in [0, 1] and not test:
+        sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-5], reverse=True)
+    elif stock_exchange == 2 and option_no == 2 and not test:
+        # for spreads sort from smaller to bigger ratio
+        sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-5], reverse=False)
+    elif stock_exchange == 2 and option_no == 2 and test:
+        sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-5], reverse=False)
+
+    # all tickers with active options
+    if write_tickers_to_file == 1 and scope == 1 and stock_exchange == 0:
+        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nyse.txt")
+    elif write_tickers_to_file == 1 and scope == 1 and stock_exchange == 1:
+        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nasdaq.txt")
+    elif write_tickers_to_file == 1 and scope == 1 and stock_exchange == 2:
+        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_arca.txt")
+
+    # nyse - calls
+    if stock_exchange == 0 and write_tickers_to_file == 1 and option_no == 0 and not test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/best_cov_calls_nyse.csv", stock_exchange, sorted_best_contracts)
+        # functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_cov_calls_nyse.csv", stock_exchange, sorted_best_contracts)
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_cov_calls_nyse.json", stock_exchange, sorted_best_contracts, "json")
+    # nyse - puts
+    elif stock_exchange == 0 and write_tickers_to_file == 1 and option_no == 1 and not test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/best_puts_nyse.csv", stock_exchange, sorted_best_contracts)
+        # functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_puts_nyse.csv", stock_exchange, sorted_best_contracts)
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_puts_nyse.json", stock_exchange, sorted_best_contracts, "json")
+
+    # nasdaq - calls
+    elif stock_exchange == 1 and write_tickers_to_file == 1 and option_no == 0 and not test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/best_cov_calls_nasdaq.csv", stock_exchange, sorted_best_contracts)
+        # functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_cov_calls_nasdaq.csv", stock_exchange, sorted_best_contracts)
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_cov_calls_nasdaq.json", stock_exchange, sorted_best_contracts, "json")
+    # nasdaq - puts
+    elif stock_exchange == 1 and write_tickers_to_file == 1 and option_no == 1 and not test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/best_puts_nasdaq.csv", stock_exchange, sorted_best_contracts)
+        # functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_puts_nasdaq.csv", stock_exchange, sorted_best_contracts)
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_puts_nasdaq.json", stock_exchange, sorted_best_contracts, "json")
+
+    # ARCA - cov calls
+    elif stock_exchange == 2 and write_tickers_to_file == 1 and option_no == 0 and not test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/best_cov_calls_arca.csv", stock_exchange, sorted_best_contracts)
+        # functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_cov_calls_arca.json", stock_exchange, sorted_best_contracts, "json")
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_cov_calls_arca.json", stock_exchange, sorted_best_contracts, "json")
+    # ARCA - puts
+    elif stock_exchange == 2 and write_tickers_to_file == 1 and option_no == 1 and not test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/best_puts_arca.csv", stock_exchange, sorted_best_contracts)
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_puts_arca.json", stock_exchange, sorted_best_contracts, "json")
+    # ARCA - spread options
+    elif stock_exchange == 2 and write_tickers_to_file == 1 and option_no == 2 and not test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/best_spread_arca.csv", stock_exchange, sorted_best_contracts)
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/best_spread_arca.json", stock_exchange, sorted_best_contracts, "json")
+
+    # ARCA Test Spread Short calls
+    elif stock_exchange == 2 and write_tickers_to_file == 1 and option_no == 2 and test:
+        functions.write_best_option_to_file("/Users/madararubino/best_options/test_arca_spread_short_calls.csv", stock_exchange, sorted_best_contracts)
+        functions.write_best_option_to_file_updated("/Users/madararubino/options-saas/shared/data/test_arca_spread_short_calls.json", stock_exchange, sorted_best_contracts, "json")
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print("--- EXECUTION TIME ---")
+    print(f"--> {execution_time:.3f} seconds")
+    print(f"--> {execution_time / 60:.2f} minutes")
 
 
-# sort by desc ratio_bid_strike
-if STOCK_EXCHANGE in [0, 1]:
-    sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-7], reverse=True)
-elif STOCK_EXCHANGE == 2 and TYPE in [0, 1]:
-    sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-5], reverse=True)
-elif STOCK_EXCHANGE == 2 and TYPE == 2:
-    # for spreads sort from smaller to bigger ratio
-    sorted_best_contracts = sorted(best_contracts_dict.values(), key=lambda x: x[-5], reverse=False)
-
-# all tickers with active options
-if WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 0:
-    functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nyse.txt")
-elif WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 1:
-    functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nasdaq.txt")
-elif WRITE_TICKERS_TO_FILE == 1 and SCOPE == 1 and STOCK_EXCHANGE == 2:
-    functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_arca.txt")
-
-# nyse - calls
-if STOCK_EXCHANGE == 0 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 0:
-    functions.write_best_option_to_file("/Users/madararubino/best_options/best_cov_calls_nyse.csv", STOCK_EXCHANGE, sorted_best_contracts)
-    functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_cov_calls_nyse.csv", STOCK_EXCHANGE, sorted_best_contracts)
-# nyse - puts
-elif STOCK_EXCHANGE == 0 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 1:
-    functions.write_best_option_to_file("/Users/madararubino/best_options/best_puts_nyse.csv", STOCK_EXCHANGE, sorted_best_contracts)
-    functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_puts_nyse.csv", STOCK_EXCHANGE, sorted_best_contracts)
-
-# nasdaq - calls
-elif STOCK_EXCHANGE == 1 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 0:
-    functions.write_best_option_to_file("/Users/madararubino/best_options/best_cov_calls_nasdaq.csv", STOCK_EXCHANGE, sorted_best_contracts)
-    functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_cov_calls_nasdaq.csv", STOCK_EXCHANGE, sorted_best_contracts)
-# nasdaq - puts
-elif STOCK_EXCHANGE == 1 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 1:
-    functions.write_best_option_to_file("/Users/madararubino/best_options/best_puts_nasdaq.csv", STOCK_EXCHANGE, sorted_best_contracts)
-    functions.write_best_option_to_file("/Users/madararubino/option_screener_js/data/best_puts_nasdaq.csv", STOCK_EXCHANGE, sorted_best_contracts)
-
-# ARCA - cov calls
-elif STOCK_EXCHANGE == 2 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 0:
-    functions.write_best_option_to_file("/Users/madararubino/best_options/best_cov_calls_arca.csv", STOCK_EXCHANGE, sorted_best_contracts)
-# ARCA - puts
-elif STOCK_EXCHANGE == 2 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 1:
-    functions.write_best_option_to_file("/Users/madararubino/best_options/best_puts_arca.csv", STOCK_EXCHANGE, sorted_best_contracts)
-# ARCA - spread options
-elif STOCK_EXCHANGE == 2 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 2:
-    functions.write_best_option_to_file("/Users/madararubino/best_options/best_spread_arca.csv", STOCK_EXCHANGE, sorted_best_contracts)
-
-end_time = time.time()
-execution_time = end_time - start_time
-print("--- EXECUTION TIME ---")
-print(f"--> {execution_time:.3f} seconds")
-print(f"--> {execution_time / 60:.2f} minutes")
-
-
-sys.exit()
-
-
-# only the best cov calls
-# contract, date, ticker, price, delta_price_premium, spread_strike_price, strike, bid, open_interest, imp_volatility, ratio_bid_strike, sector, industry, highest_price, avg_price, lowest_price, beta
-if STOCK_EXCHANGE == 0 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 0:
-    with open("/Users/madararubino/best_options/best_cov_calls_nyse.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-
-    with open("/Users/madararubino/option_screener_js/data/best_cov_calls_nyse.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-if STOCK_EXCHANGE == 1 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 0:
-    with open("/Users/madararubino/best_options/best_cov_calls_nasdaq.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-
-    with open("/Users/madararubino/option_screener_js/data/best_cov_calls_nasdaq.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-
-# only the best put options
-# contract, date, ticker, price, delta_price_premium, spread_strike_price, strike, bid, open_interest, imp_volatility, ratio_bid_strike sector, industry, highest_price, avg_price, lowest_price, beta
-if STOCK_EXCHANGE == 0 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 1:
-    with open("/Users/madararubino/best_options/best_puts_nyse.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-
-    with open("/Users/madararubino/option_screener_js/data/best_puts_nyse.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-elif STOCK_EXCHANGE == 1 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 1:
-    with open("/Users/madararubino/best_options/best_puts_nasdaq.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-
-    with open("/Users/madararubino/option_screener_js/data/best_puts_nasdaq.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "sector", "industry", "highest", "avg price", "lowest", "beta"])  # header row
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-10], row[-7], row[-6], row[-5], row[-4], row[-3], row[-2], row[-1]])
-
-# only the best spread options
-elif STOCK_EXCHANGE == 2 and WRITE_TICKERS_TO_FILE == 1 and TYPE == 2:
-    with open("/Users/madararubino/best_options/best_spread_arca.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["contract", "expiry_date", "current_price", "strike_price", "premium", "ratio", "highest", "avg price", "lowest"])
-        for row in sorted_best_contracts:
-            writer.writerow([row[0], row[1], row[3], row[6], row[-7], row[-4], row[-3], row[-1], row[-2]])
-
-
-end_time = time.time()
-execution_time = end_time - start_time
-print("--- EXECUTION TIME ---")
-print(f"--> {execution_time:.3f} seconds")
-print(f"--> {execution_time / 60:.2f} minutes")
+if __name__ == "__main__":
+    main()
