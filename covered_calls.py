@@ -46,10 +46,10 @@ def run(
         cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
 
         for i in range(len(cc_contract)):
-            spread_bid_ask = round(cc_ask[i] - cc_bid[i], 2)
-            spread_strike_price = round(cc_strike[i] - current_price, 2)
-            delta_price_premium = round(cc_strike[i] - current_price + cc_bid[i], 2)
-            ratio_bid_strike = round((cc_bid[i] / cc_strike[i]) * 100, 2)
+            spread_bid_ask = round(cc_ask.iloc[i] - cc_bid.iloc[i], 2)
+            spread_strike_price = round(cc_strike.iloc[i] - current_price, 2)
+            delta_price_premium = round(cc_strike.iloc[i] - current_price + cc_bid.iloc[i], 2)
+            ratio_bid_strike = round((cc_bid.iloc[i] / cc_strike.iloc[i]) * 100, 2)
             price_vs_avgs = -1
             if current_price < avg_price and current_price < avg_price_7d and current_price < avg_price_30d:
                 price_vs_avgs = 0  # price is lower than the averages
@@ -63,32 +63,32 @@ def run(
             elif price_vs_avgs == 0 and trend == 0:
                 main_trend = -1  # downtrend
 
-            if cc_bid[i] >= threshold_bid and cc_strike[i] > current_price and rel_std_deviation < std_dev_threshold:
+            if cc_bid.iloc[i] >= threshold_bid and cc_strike.iloc[i] > current_price and rel_std_deviation < std_dev_threshold:
                 # This must be in the main, not here
                 # if ticker.symbol not in best_tickers_with_options:
                 #     best_tickers_with_options.append(ticker.symbol)
-                contract[cc_contract[i]] = dict(symbol=ticker.symbol,
-                                                contract=cc_contract[i],
-                                                strike_date=option_date,
-                                                current_price=current_price,
-                                                rel_std_deviation=rel_std_deviation,
-                                                spread_premium_price_and_bid=round(float(delta_price_premium), 2),
-                                                spread_strike_price=round(float(spread_strike_price), 2),
-                                                strike_price=round(float(cc_strike[i]), 2),
-                                                bid=round(float(cc_bid[i] * 100), 2),
-                                                spread_bid_ask=round(float(spread_bid_ask), 2),
-                                                open_interest=cc_open_interest[i],
-                                                impl_volatility=cc_impl_volatility[i],
-                                                ratio_bid_strike=ratio_bid_strike,  # pivot field
-                                                sector=sector,
-                                                industry=industry,
-                                                highest_price=highest_price,
-                                                avg_price=avg_price,
-                                                lowest_price=lowest_price,
-                                                main_trend=main_trend,
-                                                beta=beta)
+                contract[cc_contract.iloc[i]] = dict(symbol=ticker.symbol,
+                                                     contract=cc_contract.iloc[i],
+                                                     strike_date=option_date,
+                                                     current_price=current_price,
+                                                     rel_std_deviation=rel_std_deviation,
+                                                     spread_premium_price_and_bid=round(float(delta_price_premium), 2),
+                                                     spread_strike_price=round(float(spread_strike_price), 2),
+                                                     strike_price=round(float(cc_strike[i]), 2),
+                                                     bid=round(float(cc_bid[i] * 100), 2),
+                                                     spread_bid_ask=round(float(spread_bid_ask), 2),
+                                                     open_interest=cc_open_interest[i],
+                                                     impl_volatility=cc_impl_volatility[i],
+                                                     ratio_bid_strike=ratio_bid_strike,  # pivot field
+                                                     sector=sector,
+                                                     industry=industry,
+                                                     highest_price=highest_price,
+                                                     avg_price=avg_price,
+                                                     lowest_price=lowest_price,
+                                                     main_trend=main_trend,
+                                                     beta=beta)
 
-                all_contracts.append(contract[cc_contract[i]])
+                all_contracts.append(contract[cc_contract.iloc[i]])
 
     # sort contracts based on the ratio bid/strike price
     all_contracts_sorted = sorted(all_contracts, key=lambda x: x["ratio_bid_strike"], reverse=True)
