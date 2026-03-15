@@ -20,24 +20,17 @@ def run(
     current_price: float,
     sector: str,
     industry: str,
-    beta: float
+    beta: float,
+
+    lowest_price: float,
+    highest_price: float,
+    avg_price: float,
+    avg_price_7d: float,
+    avg_price_30d: float,
+    trend: int,
+    rel_std_deviation: float
 
 ) -> list[dict[str, Any]]:
-
-    price_data = ticker.get_price_stats()
-    if not price_data:
-        return []
-
-    lowest_price = price_data["low"]
-    highest_price = price_data["high"]
-    # first_price = price_data["first_price"]
-    # last_price = price_data["last_price"]
-    avg_price = price_data["avg_price"]
-    avg_price_7d = price_data["avg_price_7d"]
-    avg_price_30d = price_data["avg_price_30d"]
-    trend = price_data["price_trend"]
-    # abs_std_deviation = price_data["abs_sd"]
-    rel_std_deviation = price_data["rel_sd"]
 
     cc = stock.option_chain(option_date).calls
 

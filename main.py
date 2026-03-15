@@ -108,7 +108,22 @@ def main():
             vol_aver_10days = ticker_data["vol_aver_10days"]
             vol_aver_3months = ticker_data["vol_aver_3months"]
 
-            print(ticker_data)
+            price_data = ticker.get_price_stats()
+            if not price_data:
+                return []
+
+            print(price_data)
+
+            lowest_price = price_data["low"]
+            highest_price = price_data["high"]
+            # first_price = price_data["first_price"]
+            # last_price = price_data["last_price"]
+            avg_price = price_data["avg_price"]
+            avg_price_7d = price_data["avg_price_7d"]
+            avg_price_30d = price_data["avg_price_30d"]
+            trend = price_data["price_trend"]
+            # abs_std_deviation = price_data["abs_sd"]
+            rel_std_deviation = price_data["rel_sd"]
 
             if len(options) > 0 and price <= max_stock_price:
                 if t not in tickers_with_options:
@@ -123,7 +138,22 @@ def main():
                     if year == i_year and month in l_month and day in l_day and option_no == 0:
                         # covered calls
                         try:
-                            best_contracts = cov_calls.run(ticker, d, min_bid_price, std_dev_threshold, stock, price, sector, industry, beta)
+                            best_contracts = cov_calls.run(ticker,
+                                                           d,
+                                                           min_bid_price,
+                                                           std_dev_threshold,
+                                                           stock,
+                                                           price,
+                                                           sector,
+                                                           industry,
+                                                           beta,
+                                                           lowest_price,
+                                                           highest_price,
+                                                           avg_price,
+                                                           avg_price_7d,
+                                                           avg_price_30d,
+                                                           trend,
+                                                           rel_std_deviation)
                         except Exception as e:
                             continue
 
