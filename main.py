@@ -125,6 +125,9 @@ def main():
             # abs_std_deviation = price_data["abs_sd"]
             rel_std_deviation = price_data["rel_sd"]
 
+            if rel_std_deviation > std_dev_threshold:
+                continue
+
             if len(options) > 0 and price <= max_stock_price:
                 if t not in tickers_with_options:
                     tickers_with_options.append(t)

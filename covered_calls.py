@@ -70,7 +70,7 @@ def run(
             elif price_vs_avgs == 0 and trend == 0:
                 main_trend = -1  # downtrend
 
-            if cc_bid.iloc[i] >= threshold_bid and cc_strike.iloc[i] > current_price and rel_std_deviation < std_dev_threshold:
+            if cc_bid.iloc[i] >= threshold_bid and cc_strike.iloc[i] > current_price:
                 # This must be in the main, not here
                 # if ticker.symbol not in best_tickers_with_options:
                 #     best_tickers_with_options.append(ticker.symbol)
