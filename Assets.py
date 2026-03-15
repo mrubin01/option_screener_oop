@@ -48,8 +48,8 @@ class Equity(Asset):
         else:
             print("Invalid exchange! It must be a string")
 
-    def get_info(self):
-        """ Call Yahoo Finance API and store data into a dict """
+    def _get_info(self):
+        """ Call Yahoo Finance API and store data into a dict"""
         beta = "N/A"
 
         try:
@@ -72,6 +72,40 @@ class Equity(Asset):
             return {}, None, {}, None, None, None, None, None
 
         return stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months
+
+    def get_info(self) -> dict:
+        """ Call yfinance and store data into a dict """
+        try:
+            stock = yf.Ticker(self._symbol)
+            if not stock:
+                return {}
+
+            info = stock.info
+            if not info or not isinstance(info, dict):
+                return {}
+
+            price = info.get("currentPrice")
+            if price is None:
+                return {}
+            price = float(price)
+
+            options = stock.options
+            if options is None or len(options) == 0:
+                return {}
+
+            return {
+                "stock": stock,
+                "price": price,
+                "options": options,
+                "sector": info["sector"],
+                "industry": info["industry"],
+                "beta": info["beta"],
+                "vol_aver_10days": info["averageDailyVolume10Day"],
+                "vol_aver_3months": info["averageDailyVolume3Month"],
+            }
+
+        except Exception:
+            return {}
 
     def get_high_low_price(self):
         """

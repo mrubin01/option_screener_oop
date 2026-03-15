@@ -1,25 +1,35 @@
-import sys
-import time
-import functions
 import warnings
 import pandas as pd
-from datetime import datetime
-import csv
 import Assets
-import config
+from typing import Any
+
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 
 
-def run(ticker: Assets.Equity,
-        option_date,
-        threshold_bid: float,
-        rel_std_deviation: float,
-        std_dev_threshold: float) -> list:
+def run(
+    ticker: Assets.Equity,
+    option_date: str,
+    threshold_bid: float,
+    rel_std_deviation: float,
+    std_dev_threshold: float,
+) -> list[dict[str, Any]]:
 
-    stock, current_price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months = ticker.get_info()
+    data = ticker.get_info()
+    if not data:
+        return
+
+    stock = data["stock"]
+    current_price = data["price"]
+    options = data["options"]
+    sector = data["sector"]
+    industry = data["industry"]
+    beta = data["beta"]
+    vol_aver_10days = data["vol_aver_10days"]
+    vol_aver_3months = data["vol_aver_3months"]
+
     price_data = ticker.get_high_low_price()
     lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
     avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
@@ -88,6 +98,9 @@ def run(ticker: Assets.Equity,
 
     return all_contracts_sorted
 
+
+if __name__ == "__main__":
+    raise RuntimeError("This module is not meant to be run directly")
 
 # ticker_test = Assets.Equity("AAPL", "NASDAQ")
 # print(run(ticker_test, "2026-03-13", 0.3, 12.0, 15.0))

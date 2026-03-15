@@ -77,9 +77,9 @@ match (stock_exchange, scope):
 
 data = my_file.read()
 data_into_list = data.replace('\n', ', ').split(", ")
-# ticker_list = list(filter(None, data_into_list))
+ticker_list = list(filter(None, data_into_list))
 # ticker_list = ["TNA", "BOIL", "KOLD", "SOXL", "IWM", "GDX", "SILJ"]
-ticker_list = ["AAPL"]
+# ticker_list = ["AAPL"]
 
 tickers_with_options = []
 
@@ -94,7 +94,22 @@ def main():
         print()
         for t in ticker_list:
             ticker = Assets.Equity(t, exchanges[stock_exchange])
-            stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months = ticker.get_info()
+            # stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months = ticker.get_info()
+
+            ticker_data = ticker.get_info()
+            if not ticker_data:
+                continue
+
+            print(ticker_data)
+            stock = ticker_data["stock"]
+            price = ticker_data["price"]
+            options = ticker_data["options"]
+            sector = ticker_data["sector"]
+            industry = ticker_data["industry"]
+            beta = ticker_data["beta"]
+            vol_aver_10days = ticker_data["vol_aver_10days"]
+            vol_aver_3months = ticker_data["vol_aver_3months"]
+
             if len(options) > 0 and price <= max_stock_price:
                 if t not in tickers_with_options:
                     tickers_with_options.append(t)
