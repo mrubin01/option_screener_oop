@@ -21,7 +21,6 @@ def run(
     sector: str,
     industry: str,
     beta: float,
-
     lowest_price: float,
     highest_price: float,
     avg_price: float,
@@ -29,10 +28,18 @@ def run(
     avg_price_30d: float,
     trend: int,
     rel_std_deviation: float
-
 ) -> list[dict[str, Any]]:
 
-    cc = stock.option_chain(option_date).calls
+    if threshold_bid < 0:
+        raise ValueError("threshold_bid must be non-negative")
+    if std_dev_threshold < 0:
+        raise ValueError("std_dev_threshold must be non-negative")
+
+    try:
+        cc = stock.option_chain(option_date).calls
+    except Exception as e:
+        # log and return empty list
+        return []
 
     # contract = {}
     all_contracts = []

@@ -155,6 +155,9 @@ def main():
                         except Exception as e:
                             continue
 
+                        if len(best_contracts) == 0:
+                            continue
+
                     # put options
                     elif year == i_year and month in l_month and day in l_day and option_no == 1:
                         pass
