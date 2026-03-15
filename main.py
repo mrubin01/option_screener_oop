@@ -105,8 +105,8 @@ def main():
             sector = ticker_data["sector"]
             industry = ticker_data["industry"]
             beta = float(ticker_data["beta"])
-            vol_aver_10days = ticker_data["vol_aver_10days"]
-            vol_aver_3months = ticker_data["vol_aver_3months"]
+            # vol_aver_10days = ticker_data["vol_aver_10days"]
+            # vol_aver_3months = ticker_data["vol_aver_3months"]
 
             price_data = ticker.get_price_stats()
             if not price_data:

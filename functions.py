@@ -5,27 +5,49 @@ import numpy as np
 import requests_cache
 from sklearn.linear_model import LinearRegression
 import csv
+import pandas as pd
 
 
-def get_std_dev(ticker: str, price_list: list) -> list:
+def get_std_dev(ticker: str, price_list: pd.DataFrame | pd.Series) -> list[float]:
     """
-    Starting from a list of stock prices, it calculates the absolute and the relative (%) std deviation
+    Starting from a DataFrame/Series of stock prices, calculate the absolute
+    and relative (%) standard deviation.
+
     :param ticker: the stock ticker
-    :param price_list: a list of stock prices
-    :return: a list with abs and relative std deviation
+    :param price_list: pandas DataFrame or Series of stock prices
+    :return: [abs_std_dev, rel_std_dev]
     """
     try:
-        std_dev = price_list.std()
-        abs_std_dev = std_dev[ticker]
+        if price_list is None or len(price_list) == 0:
+            return [-1, -1]
 
-        # last_close_price = price_list.iloc[-1][ticker]
-        avg_close_price = price_list.mean()[ticker]
+        # If a DataFrame is passed, extract the ticker column if present.
+        # Otherwise, if it has only one column, use that column.
+        if isinstance(price_list, pd.DataFrame):
+            if ticker in price_list.columns:
+                prices = price_list[ticker]
+            elif price_list.shape[1] == 1:
+                prices = price_list.iloc[:, 0]
+            else:
+                return [-1, -1]
+        else:
+            prices = price_list
 
-        # rel_std_dev = (abs_std_dev / last_close_price) * 100
+        prices = prices.dropna()
+        if prices.empty:
+            return [-1, -1]
+
+        abs_std_dev = float(prices.std())
+        avg_close_price = float(prices.mean())
+
+        if avg_close_price == 0:
+            return [-1, -1]
+
         rel_std_dev = (abs_std_dev / avg_close_price) * 100
 
         return [round(abs_std_dev, 2), round(rel_std_dev, 2)]
-    except Exception as e:
+
+    except Exception:
         return [-1, -1]
 
 
