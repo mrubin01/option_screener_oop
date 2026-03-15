@@ -112,8 +112,6 @@ def main():
             if not price_data:
                 return []
 
-            print(price_data)
-
             lowest_price = price_data["low"]
             highest_price = price_data["high"]
             # first_price = price_data["first_price"]

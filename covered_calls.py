@@ -34,10 +34,12 @@ def run(
 
     cc = stock.option_chain(option_date).calls
 
-    contract = {}
+    # contract = {}
     all_contracts = []
 
-    if cc is not None:
+    if cc is None or cc.empty:
+        return []
+    else:
         cc_contract = cc["contractSymbol"]
         cc_strike = cc["strike"]
         cc_bid = cc["bid"]
@@ -67,26 +69,29 @@ def run(
                 # This must be in the main, not here
                 # if ticker.symbol not in best_tickers_with_options:
                 #     best_tickers_with_options.append(ticker.symbol)
-                contract[cc_contract.iloc[i]] = dict(symbol=ticker.symbol,
-                                                     contract=cc_contract.iloc[i],
-                                                     strike_date=option_date,
-                                                     current_price=current_price,
-                                                     rel_std_deviation=rel_std_deviation,
-                                                     spread_premium_price_and_bid=round(float(delta_price_premium), 2),
-                                                     spread_strike_price=round(float(spread_strike_price), 2),
-                                                     strike_price=round(float(cc_strike[i]), 2),
-                                                     bid=round(float(cc_bid[i] * 100), 2),
-                                                     spread_bid_ask=round(float(spread_bid_ask), 2),
-                                                     open_interest=cc_open_interest[i],
-                                                     impl_volatility=cc_impl_volatility[i],
-                                                     ratio_bid_strike=ratio_bid_strike,  # pivot field
-                                                     sector=sector,
-                                                     industry=industry,
-                                                     highest_price=highest_price,
-                                                     avg_price=avg_price,
-                                                     lowest_price=lowest_price,
-                                                     main_trend=main_trend,
-                                                     beta=beta)
+
+                contract = dict(
+                    symbol=ticker.symbol,
+                    contract=cc_contract.iloc[i],
+                    strike_date=option_date,
+                    current_price=current_price,
+                    rel_std_deviation=rel_std_deviation,
+                    spread_premium_price_and_bid=round(float(delta_price_premium), 2),
+                    spread_strike_price=round(float(spread_strike_price), 2),
+                    strike_price=round(float(cc_strike[i]), 2),
+                    bid=round(float(cc_bid[i] * 100), 2),
+                    spread_bid_ask=round(float(spread_bid_ask), 2),
+                    open_interest=cc_open_interest[i],
+                    impl_volatility=cc_impl_volatility[i],
+                    ratio_bid_strike=ratio_bid_strike,  # pivot field
+                    sector=sector,
+                    industry=industry,
+                    highest_price=highest_price,
+                    avg_price=avg_price,
+                    lowest_price=lowest_price,
+                    main_trend=main_trend,
+                    beta=beta
+                )
 
                 all_contracts.append(contract[cc_contract.iloc[i]])
 
@@ -99,5 +104,3 @@ def run(
 if __name__ == "__main__":
     raise RuntimeError("This module is not meant to be run directly")
 
-# ticker_test = Assets.Equity("AAPL", "NASDAQ")
-# print(run(ticker_test, "2026-03-13", 0.3, 12.0, 15.0))
