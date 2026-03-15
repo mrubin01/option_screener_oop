@@ -145,7 +145,6 @@ def main():
                                 ticker,
                                 d,
                                 min_bid_price,
-                                std_dev_threshold,
                                 stock,
                                 price,
                                 sector,
@@ -172,6 +171,13 @@ def main():
                     elif year == i_year and month in l_month and day in l_day and option_no == 2:
                         pass
     print(best_contracts)
+    print("******")
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print("--- EXECUTION TIME ---")
+    print(f"--> {execution_time:.3f} seconds")
+    print(f"--> {execution_time / 60:.2f} minutes")
 
 
 if __name__ == "__main__":
