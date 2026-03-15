@@ -18,6 +18,9 @@ MIN_BID_PRICE = 0.1
 TREND_TYPE = ["downtrend", "uptrend", "no trend"]
 HAVE_OPTIONS = 0  # 0 no active options, 1 with active options
 
+TREND_DOWN = -1
+TREND_SIDEWAYS = 0
+TREND_UP = 1
 
 if __name__ == "__main__":
     raise RuntimeError("This module is not meant to be run directly")

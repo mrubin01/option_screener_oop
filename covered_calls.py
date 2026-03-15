@@ -1,11 +1,10 @@
-import warnings
-import pandas as pd
 import yfinance
 import Assets
 from typing import Any
+import config
 
 
-def run(
+def scan_covered_calls(
     ticker: Assets.Equity,
     option_date: str,
     threshold_bid: float,
@@ -35,7 +34,6 @@ def run(
         # log and return empty list
         return []
 
-    # contract = {}
     all_contracts = []
 
     if cc is None or cc.empty:
@@ -54,6 +52,7 @@ def run(
             delta_price_premium = round(cc_strike.iloc[i] - current_price + cc_bid.iloc[i], 2)
             ratio_bid_strike = round((cc_bid.iloc[i] / cc_strike.iloc[i]) * 100, 2)
 
+            # compare the current price with all averages
             below_all_avgs = current_price < avg_price and current_price < avg_price_7d and current_price < avg_price_30d
             above_all_avgs = current_price > avg_price and current_price > avg_price_7d and current_price > avg_price_30d
 
@@ -64,11 +63,11 @@ def run(
                 price_vs_avgs = 1  # price is higher than the averages
 
             # main_trend
-            main_trend = 0  # sideways
+            main_trend = config.TREND_SIDEWAYS
             if price_vs_avgs == 1 and trend == 1:
-                main_trend = 1  # uptrend
+                main_trend = config.TREND_UP
             elif price_vs_avgs == 0 and trend == 0:
-                main_trend = -1  # downtrend
+                main_trend = config.TREND_DOWN
 
             if cc_bid.iloc[i] >= threshold_bid and cc_strike.iloc[i] > current_price:
                 # This must be in the main, not here

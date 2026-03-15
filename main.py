@@ -141,22 +141,23 @@ def main():
                     if year == i_year and month in l_month and day in l_day and option_no == 0:
                         # covered calls
                         try:
-                            best_contracts = cov_calls.run(ticker,
-                                                           d,
-                                                           min_bid_price,
-                                                           std_dev_threshold,
-                                                           stock,
-                                                           price,
-                                                           sector,
-                                                           industry,
-                                                           beta,
-                                                           lowest_price,
-                                                           highest_price,
-                                                           avg_price,
-                                                           avg_price_7d,
-                                                           avg_price_30d,
-                                                           trend,
-                                                           rel_std_deviation)
+                            best_contracts = cov_calls.scan_covered_calls(
+                                ticker,
+                                d,
+                                min_bid_price,
+                                std_dev_threshold,
+                                stock,
+                                price,
+                                sector,
+                                industry,
+                                beta,
+                                lowest_price,
+                                highest_price,
+                                avg_price,
+                                avg_price_7d,
+                                avg_price_30d,
+                                trend,
+                                rel_std_deviation)
                         except Exception as e:
                             continue
 
