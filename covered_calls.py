@@ -59,10 +59,14 @@ def run(
             spread_strike_price = round(cc_strike.iloc[i] - current_price, 2)
             delta_price_premium = round(cc_strike.iloc[i] - current_price + cc_bid.iloc[i], 2)
             ratio_bid_strike = round((cc_bid.iloc[i] / cc_strike.iloc[i]) * 100, 2)
+
+            below_all_avgs = current_price < avg_price and current_price < avg_price_7d and current_price < avg_price_30d
+            above_all_avgs = current_price > avg_price and current_price > avg_price_7d and current_price > avg_price_30d
+
             price_vs_avgs = -1
-            if current_price < avg_price and current_price < avg_price_7d and current_price < avg_price_30d:
+            if below_all_avgs:
                 price_vs_avgs = 0  # price is lower than the averages
-            if current_price > avg_price and current_price > avg_price_7d and current_price > avg_price_30d:
+            elif above_all_avgs:
                 price_vs_avgs = 1  # price is higher than the averages
 
             # main_trend
@@ -86,7 +90,9 @@ def run(
                     spread_premium_price_and_bid=round(float(delta_price_premium), 2),
                     spread_strike_price=round(float(spread_strike_price), 2),
                     strike_price=round(float(cc_strike[i]), 2),
-                    bid=round(float(cc_bid[i] * 100), 2),
+                    bid_per_share=round(float(cc_bid.iloc[i]), 2),
+                    # bid=round(float(cc_bid[i] * 100), 2),
+                    premium_per_contract=round(float(cc_bid.iloc[i] * 100), 2),
                     spread_bid_ask=round(float(spread_bid_ask), 2),
                     open_interest=cc_open_interest[i],
                     impl_volatility=cc_impl_volatility[i],

@@ -95,6 +95,8 @@ def main():
         for t in ticker_list:
             ticker = Assets.Equity(t, exchanges[stock_exchange])
 
+            print(f"Scanning stock {t}...")
+
             ticker_data = ticker.get_info()
             if not ticker_data:
                 continue
