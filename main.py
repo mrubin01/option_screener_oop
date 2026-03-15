@@ -94,35 +94,25 @@ def main():
         print()
         for t in ticker_list:
             ticker = Assets.Equity(t, exchanges[stock_exchange])
-            # stock, price, options, sector, industry, beta, vol_aver_10days, vol_aver_3months = ticker.get_info()
 
             ticker_data = ticker.get_info()
             if not ticker_data:
                 continue
 
-            print(ticker_data)
             stock = ticker_data["stock"]
-            price = ticker_data["price"]
+            price = float(ticker_data["price"])
             options = ticker_data["options"]
             sector = ticker_data["sector"]
             industry = ticker_data["industry"]
-            beta = ticker_data["beta"]
+            beta = float(ticker_data["beta"])
             vol_aver_10days = ticker_data["vol_aver_10days"]
             vol_aver_3months = ticker_data["vol_aver_3months"]
+
+            print(ticker_data)
 
             if len(options) > 0 and price <= max_stock_price:
                 if t not in tickers_with_options:
                     tickers_with_options.append(t)
-
-                price_data = ticker.get_high_low_price()
-                lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
-                avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
-                trend = price_data[7]
-                # rel_std_deviation aka coefficient of variation: rel_std < 2 LOW, rel_std < 5 MODERATE, rel_std >= 5 HIGH, >= 10 VERY HIGH
-                abs_std_deviation, rel_std_deviation = price_data[8], price_data[9]
-
-                lowest_decrease = round((lowest_price / price) * 100, 2)
-                highest_increase = round((highest_price / price) * 100, 2)
 
                 for d in options:
                     new_date = datetime.strptime(d, "%Y-%m-%d")
@@ -133,7 +123,7 @@ def main():
                     if year == i_year and month in l_month and day in l_day and option_no == 0:
                         # covered calls
                         try:
-                            best_contracts = cov_calls.run(ticker, d, min_bid_price, rel_std_deviation, std_dev_threshold)
+                            best_contracts = cov_calls.run(ticker, d, min_bid_price, std_dev_threshold, stock, price, sector, industry, beta)
                         except Exception as e:
                             continue
 

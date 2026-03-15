@@ -1,5 +1,7 @@
 import warnings
 import pandas as pd
+import yfinance
+
 import Assets
 from typing import Any
 
@@ -13,27 +15,29 @@ def run(
     ticker: Assets.Equity,
     option_date: str,
     threshold_bid: float,
-    rel_std_deviation: float,
     std_dev_threshold: float,
+    stock: yfinance.Ticker,
+    current_price: float,
+    sector: str,
+    industry: str,
+    beta: float
+
 ) -> list[dict[str, Any]]:
 
-    data = ticker.get_info()
-    if not data:
-        return
+    price_data = ticker.get_price_stats()
+    if not price_data:
+        return []
 
-    stock = data["stock"]
-    current_price = data["price"]
-    options = data["options"]
-    sector = data["sector"]
-    industry = data["industry"]
-    beta = data["beta"]
-    vol_aver_10days = data["vol_aver_10days"]
-    vol_aver_3months = data["vol_aver_3months"]
-
-    price_data = ticker.get_high_low_price()
-    lowest_price, highest_price, first_price, last_price = price_data[0], price_data[1], price_data[2], price_data[3]
-    avg_price, avg_price_7d, avg_price_30d = price_data[4], price_data[5], price_data[6]
-    trend = price_data[7]
+    lowest_price = price_data["low"]
+    highest_price = price_data["high"]
+    # first_price = price_data["first_price"]
+    # last_price = price_data["last_price"]
+    avg_price = price_data["avg_price"]
+    avg_price_7d = price_data["avg_price_7d"]
+    avg_price_30d = price_data["avg_price_30d"]
+    trend = price_data["price_trend"]
+    # abs_std_deviation = price_data["abs_sd"]
+    rel_std_deviation = price_data["rel_sd"]
 
     cc = stock.option_chain(option_date).calls
 
