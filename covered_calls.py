@@ -22,6 +22,8 @@ def scan_covered_calls(
     rel_std_deviation: float
 ) -> list[dict[str, Any]]:
 
+    matched_contracts = []
+
     if threshold_bid < 0:
         raise ValueError("threshold_bid must be non-negative")
 
@@ -30,8 +32,6 @@ def scan_covered_calls(
     except Exception as e:
         # log and return empty list
         return []
-
-    all_contracts = []
 
     if cc is None or cc.empty:
         return []
@@ -52,13 +52,6 @@ def scan_covered_calls(
             main_trend = config.TREND_UP
         elif price_vs_avgs == 0 and trend == 0:
             main_trend = config.TREND_DOWN
-
-        # cc_contract = cc["contractSymbol"]
-        # cc_strike = cc["strike"]
-        # cc_bid = cc["bid"]
-        # cc_ask = cc["ask"]
-        # cc_open_interest = cc["openInterest"]
-        # cc_impl_volatility = round(cc["impliedVolatility"] * 100, 2)
 
         for row in cc.itertuples(index=False):
             if row.bid < threshold_bid or row.strike <= current_price:
@@ -94,12 +87,9 @@ def scan_covered_calls(
             }
 
             # all_contracts.append(contract[cc_contract.iloc[i]])
-            all_contracts.append(contract)
+            matched_contracts.append(contract)
 
-    # sort contracts based on the ratio bid/strike price
-    all_contracts_sorted = sorted(all_contracts, key=lambda x: x["ratio_bid_strike"], reverse=True)
-
-    return all_contracts_sorted
+    return matched_contracts
 
 
 if __name__ == "__main__":

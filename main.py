@@ -9,6 +9,7 @@ import Assets
 import config
 import spread_options_short_calls
 import covered_calls as cov_calls
+import sys
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -41,9 +42,8 @@ if ftse_1m < 0 and dow_jones_1m:
 
 print("|--------------------------------------------------------------------------|")
 
-test = config.TEST
-option_no = config.TYPE  # 0 call, 1 put, 2 spread
-stock_exchange = config.STOCK_EXCHANGE
+option_no = config.TYPE
+# stock_exchange = config.STOCK_EXCHANGE
 trend_no = config.TREND
 max_stock_price = config.MAX_STOCK_PRICE
 i_year, l_month, l_day = config.YEAR, config.MONTH, config.DAY
@@ -58,38 +58,36 @@ trend_type = config.TREND_TYPE
 have_options = config.HAVE_OPTIONS
 
 
-match (stock_exchange, scope):
-    case (0, 0):
-        my_file = open("/Users/madararubino/stocks_with_options_nyse.txt", "r")
-    case (1, 0):
-        my_file = open("/Users/madararubino/stocks_with_options_nasdaq.txt", "r")
-    case (2, 0):
-        my_file = open("/Users/madararubino/stocks_with_options_arca.txt", "r")
-    case (0, 1):
-        my_file = open("/Users/madararubino/shared_data/nyse_tickers_last.txt", "r")
-    case (1, 1):
-        my_file = open("/Users/madararubino/shared_data/nasdaq_tickers_last.txt", "r")
-    case (2, 1):
-        my_file = open("/Users/madararubino/shared_data/nyse_arca_tickers_last.txt")
-    case _:
-        print("Wrong values!")
-        sys.exit()
+def main(exchange_number: int = 0):
+    stock_exchange = exchange_number
 
-data = my_file.read()
-data_into_list = data.replace('\n', ', ').split(", ")
-ticker_list = list(filter(None, data_into_list))
-# ticker_list = ["TNA", "BOIL", "KOLD", "SOXL", "IWM", "GDX", "SILJ"]
-# ticker_list = ["AAPL"]
+    match (stock_exchange, scope):
+        case (0, 0):
+            my_file = open("/Users/madararubino/stocks_with_options_nyse.txt", "r")
+        case (1, 0):
+            my_file = open("/Users/madararubino/stocks_with_options_nasdaq.txt", "r")
+        case (2, 0):
+            my_file = open("/Users/madararubino/stocks_with_options_arca.txt", "r")
+        case (0, 1):
+            my_file = open("/Users/madararubino/shared_data/nyse_tickers_last.txt", "r")
+        case (1, 1):
+            my_file = open("/Users/madararubino/shared_data/nasdaq_tickers_last.txt", "r")
+        case (2, 1):
+            my_file = open("/Users/madararubino/shared_data/nyse_arca_tickers_last.txt")
+        case _:
+            print("Wrong values!")
+            sys.exit()
 
-tickers_with_options = []
+    data = my_file.read()
+    data_into_list = data.replace('\n', ', ').split(", ")
+    ticker_list = list(filter(None, data_into_list))
+    # ticker_list = ["TOST", "SOC", "RNG"]  # nyse
 
-stock_exchange = config.STOCK_EXCHANGE
+    tickers_with_options = []
+    all_best_contracts = []
 
-
-def main():
-    best_contracts = []
     start_time = time.time()
-    if stock_exchange in [0, 1] and not test:
+    if stock_exchange in [0, 1]:
         print(f"|-- Scanning {option_type[option_no]} options in {exchanges[stock_exchange]} --|")
         print()
         for t in ticker_list:
@@ -98,6 +96,7 @@ def main():
             print(f"Scanning stock {t}...")
 
             ticker_data = ticker.get_info()
+            print(ticker_data)
             if not ticker_data:
                 continue
 
@@ -111,6 +110,8 @@ def main():
             # vol_aver_3months = ticker_data["vol_aver_3months"]
 
             price_data = ticker.get_price_stats()
+            print(price_data)
+            print()
             if not price_data:
                 return []
 
@@ -162,6 +163,9 @@ def main():
 
                         if len(best_contracts) == 0:
                             continue
+                        else:
+                            for contract in best_contracts:
+                                all_best_contracts.append(contract)
 
                     # put options
                     elif year == i_year and month in l_month and day in l_day and option_no == 1:
@@ -170,8 +174,12 @@ def main():
                     # spread options
                     elif year == i_year and month in l_month and day in l_day and option_no == 2:
                         pass
-    print(best_contracts)
-    print("******")
+
+    elif stock_exchange == 2:
+        pass
+
+    all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["ratio_bid_strike"], reverse=True)
+    print(f"Tot. number of contracts: {len(all_best_contracts_sorted)}")
 
     end_time = time.time()
     execution_time = end_time - start_time
@@ -181,5 +189,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1:
+        main(int(sys.argv[1]))
+    else:
+        main()
 
