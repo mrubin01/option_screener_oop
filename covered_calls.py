@@ -65,7 +65,7 @@ def scan_covered_calls(
             contract = {
                 "symbol": ticker.symbol,
                 "contract": row.contractSymbol,
-                "strike_date": option_date,
+                "expiry_date": option_date,
                 "current_price": current_price,
                 "rel_std_deviation": rel_std_deviation,
                 "spread_premium_price_and_bid": round(float(delta_price_premium), 2),
@@ -150,7 +150,7 @@ def scan_etf_covered_calls(
             contract = {
                 "symbol": ticker.symbol,
                 "contract": row.contractSymbol,
-                "strike_date": option_date,
+                "expiry_date": option_date,
                 "current_price": current_price,
                 "rel_std_deviation": rel_std_deviation,
                 "spread_premium_price_and_bid": round(float(delta_price_premium), 2),
@@ -171,9 +171,6 @@ def scan_etf_covered_calls(
             matched_contracts.append(contract)
 
     return matched_contracts
-
-
-
 
 
 if __name__ == "__main__":

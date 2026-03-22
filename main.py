@@ -260,6 +260,24 @@ def main(exchange_number: int = 2):
     print(all_best_contracts_sorted)
     print()
 
+    # print list with stocks having options?
+
+    # write covered calls NYSE
+    if stock_exchange == 0 and option_no == 0:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_nyse.json",
+                                             0,
+                                             all_best_contracts_sorted)
+    # write covered calls NASDAQ
+    elif stock_exchange == 1 and option_no == 0:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_nasdaq.json",
+                                             1,
+                                             all_best_contracts_sorted)
+    # write covered calls ARCA
+    elif stock_exchange == 2 and option_no == 0:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_arca.json",
+                                             2,
+                                             all_best_contracts_sorted)
+
     end_time = time.time()
     execution_time = end_time - start_time
     print("--- EXECUTION TIME ---")

@@ -220,3 +220,62 @@ def write_best_option_to_file_updated(path: str, exchange: int, sorted_option_li
 
     else:
         raise ValueError("output_format must be 'csv' or 'json'")
+
+
+def write_best_options_to_json(path: str, exchange: int, sorted_option_list: list[dict]):
+    if exchange in [0, 1]:
+        keys = [
+            "symbol",
+            "contract",
+            "expiry_date",
+            "current_price",
+            "rel_std_deviation",
+            "spread_premium_price_and_bid",
+            "spread_strike_price",
+            "strike_price",
+            "bid_per_share",
+            "premium_per_contract",
+            "spread_bid_ask",
+            "open_interest",
+            "impl_volatility",
+            "ratio_bid_strike",
+            "sector",
+            "industry",
+            "highest_price",
+            "avg_price",
+            "lowest_price",
+            "main_trend",
+            "beta",
+        ]
+    elif exchange == 2:
+        keys = [
+            "symbol",
+            "contract",
+            "expiry_date",
+            "current_price",
+            "rel_std_deviation",
+            "spread_premium_price_and_bid",
+            "spread_strike_price",
+            "strike_price",
+            "bid_per_share",
+            "premium_per_contract",
+            "spread_bid_ask",
+            "open_interest",
+            "impl_volatility",
+            "ratio_bid_strike",
+            "highest_price",
+            "avg_price",
+            "lowest_price",
+            "main_trend",
+        ]
+    else:
+        raise ValueError("Wrong exchange number!")
+
+    data = []
+    for row in sorted_option_list:
+        item = {key: row[key] for key in keys}
+        # item["expiry_date"] = row["strike_date"]
+        data.append(item)
+
+    with open(path, "w") as jsonfile:
+        json.dump(data, jsonfile, indent=2)
