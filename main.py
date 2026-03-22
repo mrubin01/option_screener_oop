@@ -58,7 +58,7 @@ trend_type = config.TREND_TYPE
 have_options = config.HAVE_OPTIONS
 
 
-def main(exchange_number: int = 0):
+def main(exchange_number: int = 2):
     stock_exchange = exchange_number
 
     match (stock_exchange, scope):
@@ -176,10 +176,89 @@ def main(exchange_number: int = 0):
                         pass
 
     elif stock_exchange == 2:
-        pass
+        print(f"|-- Scanning {option_type[option_no]} options in {exchanges[stock_exchange]} --|")
+        print()
+        for t in ticker_list:
+            ticker = Assets.ETF(t, exchanges[stock_exchange])
+
+            print(f"Scanning stock {t}...")
+
+            ticker_data = ticker.get_info_etf()
+            print(ticker_data)
+            if not ticker_data:
+                continue
+
+            stock = ticker_data["stock"]
+            price = float(ticker_data["price"])
+            options = ticker_data["options"]
+
+            price_data = ticker.get_price_stats_etf()
+            print(price_data)
+            print()
+            if not price_data:
+                return []
+
+            lowest_price = price_data["low"]
+            highest_price = price_data["high"]
+            # first_price = price_data["first_price"]
+            # last_price = price_data["last_price"]
+            avg_price = price_data["avg_price"]
+            avg_price_7d = price_data["avg_price_7d"]
+            avg_price_30d = price_data["avg_price_30d"]
+            trend = price_data["price_trend"]
+            # abs_std_deviation = price_data["abs_sd"]
+            rel_std_deviation = price_data["rel_sd"]
+
+            if rel_std_deviation > std_dev_threshold:
+                continue
+
+            if len(options) > 0 and price <= max_stock_price:
+                if t not in tickers_with_options:
+                    tickers_with_options.append(t)
+
+                for d in options:
+                    new_date = datetime.strptime(d, "%Y-%m-%d")
+                    day = new_date.day
+                    month = new_date.month
+                    year = new_date.year
+
+                    if year == i_year and month in l_month and day in l_day and option_no == 0:
+                        # covered calls
+                        try:
+                            best_contracts = cov_calls.scan_etf_covered_calls(
+                                ticker,
+                                d,
+                                min_bid_price,
+                                stock,
+                                price,
+                                lowest_price,
+                                highest_price,
+                                avg_price,
+                                avg_price_7d,
+                                avg_price_30d,
+                                trend,
+                                rel_std_deviation)
+                        except Exception as e:
+                            continue
+
+                        if len(best_contracts) == 0:
+                            continue
+                        else:
+                            for contract in best_contracts:
+                                all_best_contracts.append(contract)
+
+                    # put options
+                    elif year == i_year and month in l_month and day in l_day and option_no == 1:
+                        pass
+
+                    # spread options
+                    elif year == i_year and month in l_month and day in l_day and option_no == 2:
+                        pass
 
     all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["ratio_bid_strike"], reverse=True)
     print(f"Tot. number of contracts: {len(all_best_contracts_sorted)}")
+    print(all_best_contracts_sorted)
+    print()
 
     end_time = time.time()
     execution_time = end_time - start_time
