@@ -96,7 +96,7 @@ def main(exchange_number: int = 2):
             print(f"Scanning stock {t}...")
 
             ticker_data = ticker.get_info()
-            print(ticker_data)
+
             if not ticker_data:
                 continue
 
@@ -109,11 +109,12 @@ def main(exchange_number: int = 2):
             # vol_aver_10days = ticker_data["vol_aver_10days"]
             # vol_aver_3months = ticker_data["vol_aver_3months"]
 
+            if price > max_stock_price:
+                continue
+
             price_data = ticker.get_price_stats()
-            print(price_data)
-            print()
             if not price_data:
-                return []
+                continue
 
             lowest_price = price_data["low"]
             highest_price = price_data["high"]
@@ -129,7 +130,7 @@ def main(exchange_number: int = 2):
             if rel_std_deviation > std_dev_threshold:
                 continue
 
-            if len(options) > 0 and price <= max_stock_price:
+            if len(options) > 0:
                 if t not in tickers_with_options:
                     tickers_with_options.append(t)
 
@@ -184,7 +185,6 @@ def main(exchange_number: int = 2):
             print(f"Scanning stock {t}...")
 
             ticker_data = ticker.get_info_etf()
-            print(ticker_data)
             if not ticker_data:
                 continue
 
@@ -192,11 +192,12 @@ def main(exchange_number: int = 2):
             price = float(ticker_data["price"])
             options = ticker_data["options"]
 
+            if price > max_stock_price:
+                continue
+
             price_data = ticker.get_price_stats_etf()
-            print(price_data)
-            print()
             if not price_data:
-                return []
+                continue
 
             lowest_price = price_data["low"]
             highest_price = price_data["high"]
@@ -212,7 +213,7 @@ def main(exchange_number: int = 2):
             if rel_std_deviation > std_dev_threshold:
                 continue
 
-            if len(options) > 0 and price <= max_stock_price:
+            if len(options) > 0:
                 if t not in tickers_with_options:
                     tickers_with_options.append(t)
 

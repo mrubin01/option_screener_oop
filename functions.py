@@ -137,6 +137,8 @@ def write_tickers_to_file(tickers: list, filename: str):
 
 def write_best_option_to_file(path: str, exchange: int, sorted_option_list: list):
     """
+    This function has been replaced
+
     Write a list of option into a directory as a csv file
     :param path: a string with the path
     :param exchange: 0 NYSE, 1 NASDAQ, 2, ARCA
@@ -160,6 +162,7 @@ def write_best_option_to_file(path: str, exchange: int, sorted_option_list: list
 
 
 def write_best_option_to_file_updated(path: str, exchange: int, sorted_option_list: list, output_format: str):
+    """This function has been replaced"""
     output_format = output_format.lower()
 
     if exchange in [0, 1] and output_format == "csv":

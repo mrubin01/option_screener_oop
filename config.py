@@ -1,7 +1,7 @@
 # global variables
 TEST = False
 TYPE = 0  # 0 call, 1 put, 2 spread
-STOCK_EXCHANGE = 2  # nyse, nasdaq, arca
+STOCK_EXCHANGE = 1  # nyse, nasdaq, arca
 TREND = -1  # -1 no trend, 0 downtrend, 1 uptrend
 if TYPE in [0, 1]:
     MAX_STOCK_PRICE = 50
