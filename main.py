@@ -9,6 +9,7 @@ import Assets
 import config
 import spread_options_short_calls
 import covered_calls as cov_calls
+import put_options as put_options
 import sys
 
 warnings.simplefilter("ignore")
@@ -170,12 +171,37 @@ def main(exchange_number: int = 2):
 
                     # put options
                     elif year == i_year and month in l_month and day in l_day and option_no == 1:
-                        pass
+                        try:
+                            best_contracts = put_options.scan_put_options(
+                                ticker,
+                                d,
+                                min_bid_price,
+                                stock,
+                                price,
+                                sector,
+                                industry,
+                                beta,
+                                lowest_price,
+                                highest_price,
+                                avg_price,
+                                avg_price_7d,
+                                avg_price_30d,
+                                trend,
+                                rel_std_deviation)
+                        except Exception as e:
+                            continue
+
+                        if len(best_contracts) == 0:
+                            continue
+                        else:
+                            for contract in best_contracts:
+                                all_best_contracts.append(contract)
 
                     # spread options
                     elif year == i_year and month in l_month and day in l_day and option_no == 2:
                         pass
 
+    # ARCA
     elif stock_exchange == 2:
         print(f"|-- Scanning {option_type[option_no]} options in {exchanges[stock_exchange]} --|")
         print()
@@ -250,7 +276,28 @@ def main(exchange_number: int = 2):
 
                     # put options
                     elif year == i_year and month in l_month and day in l_day and option_no == 1:
-                        pass
+                        try:
+                            best_contracts = put_options.scan_etf_put_options(
+                                ticker,
+                                d,
+                                min_bid_price,
+                                stock,
+                                price,
+                                lowest_price,
+                                highest_price,
+                                avg_price,
+                                avg_price_7d,
+                                avg_price_30d,
+                                trend,
+                                rel_std_deviation)
+                        except Exception as e:
+                            continue
+
+                        if len(best_contracts) == 0:
+                            continue
+                        else:
+                            for contract in best_contracts:
+                                all_best_contracts.append(contract)
 
                     # spread options
                     elif year == i_year and month in l_month and day in l_day and option_no == 2:
@@ -263,17 +310,17 @@ def main(exchange_number: int = 2):
 
     # print list with stocks having options?
 
-    # write covered calls NYSE
+    # write NYSE covered calls
     if stock_exchange == 0 and option_no == 0:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_nyse.json",
                                              0,
                                              all_best_contracts_sorted)
-    # write covered calls NASDAQ
+    # write NASDAQ covered calls
     elif stock_exchange == 1 and option_no == 0:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_nasdaq.json",
                                              1,
                                              all_best_contracts_sorted)
-    # write covered calls ARCA
+    # write ARCA covered calls
     elif stock_exchange == 2 and option_no == 0:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_arca.json",
                                              2,

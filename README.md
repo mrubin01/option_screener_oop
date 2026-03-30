@@ -15,3 +15,8 @@ the loop will continue with the following ticker
 
 ### Covered calls
 If the function completes, it will return a dictionary with 21 (equity) or 18 (ETF) items  
+
+### Put options  
+
+
+### Spread options  
