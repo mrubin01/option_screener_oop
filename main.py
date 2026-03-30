@@ -315,14 +315,30 @@ def main(exchange_number: int = 2):
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_nyse.json",
                                              0,
                                              all_best_contracts_sorted)
+    # write NYSE put options
+    if stock_exchange == 0 and option_no == 1:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_put_options_nyse.json",
+                                             0,
+                                             all_best_contracts_sorted)
+
     # write NASDAQ covered calls
     elif stock_exchange == 1 and option_no == 0:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_nasdaq.json",
                                              1,
                                              all_best_contracts_sorted)
+    # write NASDAQ put options
+    elif stock_exchange == 1 and option_no == 1:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_put_options_nasdaq.json",
+                                             1,
+                                             all_best_contracts_sorted)
     # write ARCA covered calls
     elif stock_exchange == 2 and option_no == 0:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_arca.json",
+                                             2,
+                                             all_best_contracts_sorted)
+    # write ARCA put options
+    elif stock_exchange == 2 and option_no == 1:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_put_options_arca.json",
                                              2,
                                              all_best_contracts_sorted)
 
