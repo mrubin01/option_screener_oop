@@ -2,10 +2,12 @@ import yfinance
 import Assets
 from typing import Any
 import config
+import math
 
 
 def scan_put_options(
     ticker: Assets.Equity,
+    exchange: str,
     option_date: str,
     threshold_bid: float,
     stock: yfinance.Ticker,
@@ -63,7 +65,8 @@ def scan_put_options(
             ratio_bid_strike = round((row.bid / row.strike) * 100, 2)
 
             contract = {
-                "symbol": ticker.symbol,
+                "ticker": ticker.symbol,
+                "exchange": exchange,
                 "contract": row.contractSymbol,
                 "expiry_date": option_date,
                 "current_price": current_price,
@@ -92,18 +95,19 @@ def scan_put_options(
 
 
 def scan_etf_put_options(
-    ticker: Assets.ETF,
-    option_date: str,
-    threshold_bid: float,
-    stock: yfinance.Ticker,
-    current_price: float,
-    lowest_price: float,
-    highest_price: float,
-    avg_price: float,
-    avg_price_7d: float,
-    avg_price_30d: float,
-    trend: int,
-    rel_std_deviation: float
+        ticker: Assets.ETF,
+        exchange: str,
+        option_date: str,
+        threshold_bid: float,
+        stock: yfinance.Ticker,
+        current_price: float,
+        lowest_price: float,
+        highest_price: float,
+        avg_price: float,
+        avg_price_7d: float,
+        avg_price_30d: float,
+        trend: int,
+        rel_std_deviation: float
 ) -> list[dict[str, Any]]:
 
     matched_contracts = []
@@ -141,13 +145,29 @@ def scan_etf_put_options(
             if row.bid < threshold_bid or row.strike <= current_price:
                 continue
 
+            if row.bid is None or row.bid == "" or (isinstance(row.bid, float) and math.isnan(row.bid)):
+                continue
+
             spread_bid_ask = round(row.ask - row.bid, 2)
             spread_strike_price = round(row.strike - current_price, 2)
             delta_price_premium = round(row.strike - current_price + row.bid, 2)
             ratio_bid_strike = round((row.bid / row.strike) * 100, 2)
 
+            if spread_bid_ask is None or spread_bid_ask == "" or (isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask)):
+                continue
+
+            if spread_strike_price is None or spread_strike_price == "" or (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)):
+                continue
+
+            if ratio_bid_strike is None or ratio_bid_strike == "" or (isinstance(ratio_bid_strike, float) and math.isnan(ratio_bid_strike)):
+                continue
+
+            if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
+                continue
+
             contract = {
-                "symbol": ticker.symbol,
+                "ticker": ticker.symbol,
+                "exchange": exchange,
                 "contract": row.contractSymbol,
                 "expiry_date": option_date,
                 "current_price": current_price,

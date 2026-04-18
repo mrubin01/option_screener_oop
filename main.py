@@ -59,7 +59,7 @@ trend_type = config.TREND_TYPE
 have_options = config.HAVE_OPTIONS
 
 
-def main(exchange_number: int = 2):
+def main(exchange_number: int = 1):
     stock_exchange = exchange_number
 
     match (stock_exchange, scope):
@@ -82,7 +82,7 @@ def main(exchange_number: int = 2):
     data = my_file.read()
     data_into_list = data.replace('\n', ', ').split(", ")
     ticker_list = list(filter(None, data_into_list))
-    # ticker_list = ["TOST", "SOC", "RNG"]  # nyse
+    # ticker_list = ["ABEV", "ABR", "ACI"]
 
     tickers_with_options = []
     all_best_contracts = []
@@ -146,6 +146,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = cov_calls.scan_covered_calls(
                                 ticker,
+                                exchanges[stock_exchange],
                                 d,
                                 min_bid_price,
                                 stock,
@@ -174,6 +175,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = put_options.scan_put_options(
                                 ticker,
+                                exchanges[stock_exchange],
                                 d,
                                 min_bid_price,
                                 stock,
@@ -200,6 +202,9 @@ def main(exchange_number: int = 2):
                     # spread options
                     elif year == i_year and month in l_month and day in l_day and option_no == 2:
                         pass
+
+            else:
+                print(" option len is 0")
 
     # ARCA
     elif stock_exchange == 2:
@@ -235,6 +240,7 @@ def main(exchange_number: int = 2):
             trend = price_data["price_trend"]
             # abs_std_deviation = price_data["abs_sd"]
             rel_std_deviation = price_data["rel_sd"]
+            print(rel_std_deviation)
 
             if rel_std_deviation > std_dev_threshold:
                 continue
@@ -254,6 +260,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = cov_calls.scan_etf_covered_calls(
                                 ticker,
+                                exchanges[stock_exchange],
                                 d,
                                 min_bid_price,
                                 stock,
@@ -279,6 +286,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = put_options.scan_etf_put_options(
                                 ticker,
+                                exchanges[stock_exchange],
                                 d,
                                 min_bid_price,
                                 stock,
@@ -303,9 +311,11 @@ def main(exchange_number: int = 2):
                     elif year == i_year and month in l_month and day in l_day and option_no == 2:
                         pass
 
+            else:
+                print("option len is 0")
+
     all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["ratio_bid_strike"], reverse=True)
     print(f"Tot. number of contracts: {len(all_best_contracts_sorted)}")
-    print(all_best_contracts_sorted)
     print()
 
     # print list with stocks having options?

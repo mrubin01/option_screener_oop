@@ -225,10 +225,11 @@ def write_best_option_to_file_updated(path: str, exchange: int, sorted_option_li
         raise ValueError("output_format must be 'csv' or 'json'")
 
 
-def write_best_options_to_json(path: str, exchange: int, sorted_option_list: list[dict]):
-    if exchange in [0, 1]:
+def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: list[dict]):
+    if exchange_no in [0, 1]:
         keys = [
             "symbol",
+            "exchange",
             "contract",
             "expiry_date",
             "current_price",
@@ -250,9 +251,10 @@ def write_best_options_to_json(path: str, exchange: int, sorted_option_list: lis
             "main_trend",
             "beta",
         ]
-    elif exchange == 2:
+    elif exchange_no == 2:
         keys = [
             "symbol",
+            "exchange",
             "contract",
             "expiry_date",
             "current_price",
