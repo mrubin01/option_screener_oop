@@ -13,6 +13,30 @@ In the main for the object ticker, equity or ETF, there are four checks: price d
 and price vs threshold. This happens before calling the option function: if any of these checks is negative,  
 the loop will continue with the following ticker  
 
+Fields:
+"ticker",
+"exchange",
+"contract",
+"expiry_date",
+"current_price",
+"rel_std_deviation",
+"spread_premium_price_and_bid",
+"spread_strike_price",
+"strike_price",
+"bid_per_share",
+"premium_per_contract",
+"spread_bid_ask",
+"open_interest",
+"impl_volatility",
+"ratio_bid_strike",
+"sector"                        -> nullable,
+"industry"                      -> nullable,
+"highest_price",
+"avg_price",
+"lowest_price",
+"main_trend",
+"beta"                          -> nullable
+
 ### Covered calls
 If the function completes, it will return a dictionary with 21 (equity) or 18 (ETF) items  
 
