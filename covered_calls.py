@@ -201,7 +201,7 @@ def scan_etf_covered_calls(
                 continue
 
             days_to_expiration = functions.days_to_expiration(option_date)
-            delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, 3.68, row.impliedVolatility)
+            est_delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, 3.68, row.impliedVolatility)
 
             option_yield = round((row.bid / current_price) * 100, 2)
             annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
@@ -234,7 +234,7 @@ def scan_etf_covered_calls(
                 "option_yield": option_yield,
                 "roc": annualized_option_yield,
                 "tot_return": tot_return,
-                "delta": delta,
+                "delta": est_delta,
                 "highest_price": highest_price,
                 "avg_price": avg_price,
                 "lowest_price": lowest_price,
