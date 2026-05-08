@@ -3,6 +3,7 @@ import Assets
 from typing import Any
 import config
 import math
+import functions
 
 
 def scan_covered_calls(
@@ -63,20 +64,34 @@ def scan_covered_calls(
                 continue
 
             spread_bid_ask = round(row.ask - row.bid, 2)
-            spread_strike_price = round(row.strike - current_price, 2)
-            delta_price_premium = round(row.strike - current_price + row.bid, 2)
-            ratio_bid_strike = round((row.bid / row.strike) * 100, 2)
+            spread_strike_price = round(abs(row.strike - current_price), 2)
+            delta_price_premium = round(abs(row.strike - current_price + row.bid), 2)
+            break_even = round(current_price - row.bid, 2)
 
             if spread_bid_ask is None or spread_bid_ask == "" or (isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask)):
                 continue
 
-            if spread_strike_price is None or spread_strike_price == "" or (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)):
-                continue
-
-            if ratio_bid_strike is None or ratio_bid_strike == "" or (isinstance(ratio_bid_strike, float) and math.isnan(ratio_bid_strike)):
+            if spread_strike_price is None or \
+                    spread_strike_price == "" or \
+                    (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
+                    spread_strike_price < config.STRIKE_PRICE_THRESHOLD or \
+                    spread_strike_price > 20:
                 continue
 
             if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
+                continue
+
+            days_to_expiration = functions.days_to_expiration(option_date)
+            est_delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, 3.68, row.impliedVolatility)
+
+            option_yield = round((row.bid / current_price) * 100, 2)
+            annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
+            tot_return = round(((row.strike - current_price + row.bid) / current_price) * 100, 2)
+
+            if option_yield is None or \
+                    option_yield == "" or \
+                    option_yield > 25 or \
+                    (isinstance(option_yield, float) and math.isnan(option_yield)):
                 continue
 
             contract = {
@@ -84,17 +99,23 @@ def scan_covered_calls(
                 "exchange": exchange,
                 "contract": row.contractSymbol,
                 "expiry_date": option_date,
+                "days_to_expiration": days_to_expiration,
                 "current_price": current_price,
-                "rel_std_deviation": rel_std_deviation,
-                "spread_premium_price_and_bid": round(float(delta_price_premium), 2),
-                "spread_strike_price": round(float(spread_strike_price), 2),
+                "coeff_variation": rel_std_deviation,
+                "max_profit": round(float(delta_price_premium), 2),
+                "max_profit_per_contract": round(float(delta_price_premium * 100), 2),
+                "otm": round(float(spread_strike_price), 2),
                 "strike_price": round(float(row.strike), 2),
                 "bid_per_share": round(float(row.bid), 2),
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
-                "open_interest": row.openInterest,
+                "break_even": break_even,
+                "open_interest": functions.normalize_nullable_fields(row.openInterest),
                 "impl_volatility": round(float(row.impliedVolatility * 100), 2),
-                "ratio_bid_strike": ratio_bid_strike,
+                "option_yield": option_yield,
+                "roc": annualized_option_yield,
+                "tot_return": tot_return,
+                "delta": est_delta,
                 "sector": sector,
                 "industry": industry,
                 "highest_price": highest_price,
@@ -162,26 +183,58 @@ def scan_etf_covered_calls(
                 continue
 
             spread_bid_ask = round(row.ask - row.bid, 2)
-            spread_strike_price = round(row.strike - current_price, 2)
-            delta_price_premium = round(row.strike - current_price + row.bid, 2)
-            ratio_bid_strike = round((row.bid / row.strike) * 100, 2)
+            spread_strike_price = round(abs(row.strike - current_price), 2)
+            delta_price_premium = round(abs(row.strike - current_price + row.bid), 2)
+            break_even = round(current_price - row.bid, 2)
+
+            if spread_bid_ask is None or spread_bid_ask == "" or (isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask)):
+                continue
+
+            if spread_strike_price is None or \
+                    spread_strike_price == "" or \
+                    (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
+                    spread_strike_price < config.STRIKE_PRICE_THRESHOLD or \
+                    spread_strike_price > 20:
+                continue
+
+            if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
+                continue
+
+            days_to_expiration = functions.days_to_expiration(option_date)
+            delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, 3.68, row.impliedVolatility)
+
+            option_yield = round((row.bid / current_price) * 100, 2)
+            annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
+            tot_return = round(((row.strike - current_price + row.bid) / current_price) * 100, 2)
+
+            if option_yield is None or \
+                    option_yield == "" or \
+                    option_yield > 25 or \
+                    (isinstance(option_yield, float) and math.isnan(option_yield)):
+                continue
 
             contract = {
                 "ticker": ticker.symbol,
                 "exchange": exchange,
                 "contract": row.contractSymbol,
                 "expiry_date": option_date,
+                "days_to_expiration": days_to_expiration,
                 "current_price": current_price,
-                "rel_std_deviation": rel_std_deviation,
-                "spread_premium_price_and_bid": round(float(delta_price_premium), 2),
-                "spread_strike_price": round(float(spread_strike_price), 2),
+                "coeff_variation": rel_std_deviation,
+                "max_profit": round(float(delta_price_premium), 2),
+                "max_profit_per_contract": round(float(delta_price_premium * 100), 2),
+                "otm": round(float(spread_strike_price), 2),
                 "strike_price": round(float(row.strike), 2),
                 "bid_per_share": round(float(row.bid), 2),
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
-                "open_interest": row.openInterest,
+                "break_even": break_even,
+                "open_interest": functions.normalize_nullable_fields(row.openInterest),
                 "impl_volatility": round(float(row.impliedVolatility * 100), 2),
-                "ratio_bid_strike": ratio_bid_strike,
+                "option_yield": option_yield,
+                "roc": annualized_option_yield,
+                "tot_return": tot_return,
+                "delta": delta,
                 "highest_price": highest_price,
                 "avg_price": avg_price,
                 "lowest_price": lowest_price,

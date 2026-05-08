@@ -6,6 +6,106 @@ import requests_cache
 from sklearn.linear_model import LinearRegression
 import csv
 import pandas as pd
+import math
+from py_vollib.black_scholes.greeks.analytical import delta
+from datetime import date, datetime
+
+
+def days_to_expiration(expiration_date: str, today: date | None = None) -> int:
+    """
+    Calculate calendar days from today to an option expiration date.
+
+    Parameters
+    ----------
+    expiration_date : str
+        Expiration date in 'YYYY-MM-DD' format.
+        Example: '2026-05-01'
+    today : date | None
+        Optional custom start date. Defaults to today's date.
+
+    Returns
+    -------
+    int
+        Number of calendar days until expiration.
+    """
+
+    if today is None:
+        today = date.today()
+
+    expiry = datetime.strptime(expiration_date, "%Y-%m-%d").date()
+
+    return (expiry - today).days
+
+
+def normalize_rate(value: float) -> float:
+    """
+    Accepts either:
+    - 3.68 for 3.68%
+    - 0.0368 for 3.68%
+    """
+    value = float(value)
+    return value / 100 if value > 1 else value
+
+
+def normalize_iv(value: float) -> float:
+    """
+    Accepts IV in common formats:
+    - 115.23 means 115.23%
+    - 1.1523 means 115.23%
+    - 0.4263 means 42.63%
+    """
+    value = float(value)
+
+    if value > 3:
+        return value / 100
+
+    return value
+
+
+def estimate_delta(
+    strategy: str,
+    current_price: float,
+    strike_price: float,
+    days: int,
+    risk_free_rate: float,
+    impl_volatility: float,
+    decimals: int = 2,
+) -> str:
+    strategy = strategy.lower().strip()
+
+    S = float(current_price)
+    K = float(strike_price)
+    t = float(days) / 365
+    r = normalize_rate(risk_free_rate)
+    sigma = normalize_iv(impl_volatility)
+
+    if strategy in ["covered_call", "cc", "call"]:
+        option_type = "c"
+    elif strategy in ["cash_secured_put", "csp", "put"]:
+        option_type = "p"
+    else:
+        raise ValueError(
+            "strategy must be 'covered_call', 'cc', 'cash_secured_put', or 'csp'"
+        )
+
+    option_delta = float(delta(option_type, S, K, t, r, sigma))
+    probability = abs(option_delta) * 100
+
+    return f"{probability:.{decimals}f}"
+
+
+def normalize_nullable_fields(value):
+    """It returns null instead of NaN or an empty string"""
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+
+    text = str(value).strip()
+    if text == "" or text.lower() == "nan":
+        return None
+
+    return text
 
 
 def get_std_dev(ticker: str, price_list: pd.DataFrame | pd.Series) -> list[float]:
@@ -228,21 +328,27 @@ def write_best_option_to_file_updated(path: str, exchange: int, sorted_option_li
 def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: list[dict]):
     if exchange_no in [0, 1]:
         keys = [
-            "symbol",
+            "ticker",
             "exchange",
             "contract",
             "expiry_date",
+            "days_to_expiration",
             "current_price",
-            "rel_std_deviation",
-            "spread_premium_price_and_bid",
-            "spread_strike_price",
+            "coeff_variation",
+            "max_profit",
+            "max_profit_per_contract",
+            "otm",
             "strike_price",
             "bid_per_share",
             "premium_per_contract",
             "spread_bid_ask",
+            "break_even",
             "open_interest",
             "impl_volatility",
-            "ratio_bid_strike",
+            "option_yield",
+            "roc",
+            "tot_return",
+            "delta",
             "sector",
             "industry",
             "highest_price",
@@ -253,21 +359,27 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
         ]
     elif exchange_no == 2:
         keys = [
-            "symbol",
+            "ticker",
             "exchange",
             "contract",
             "expiry_date",
+            "days_to_expiration",
             "current_price",
-            "rel_std_deviation",
-            "spread_premium_price_and_bid",
-            "spread_strike_price",
+            "coeff_variation",
+            "max_profit",
+            "max_profit_per_contract",
+            "otm",
             "strike_price",
             "bid_per_share",
             "premium_per_contract",
             "spread_bid_ask",
+            "break_even",
             "open_interest",
             "impl_volatility",
-            "ratio_bid_strike",
+            "option_yield",
+            "roc",
+            "tot_return",
+            "delta",
             "highest_price",
             "avg_price",
             "lowest_price",

@@ -7,6 +7,7 @@ from datetime import datetime
 import csv
 import Assets
 import config
+import spread_options
 import spread_options_short_calls
 import covered_calls as cov_calls
 import put_options as put_options
@@ -59,7 +60,7 @@ trend_type = config.TREND_TYPE
 have_options = config.HAVE_OPTIONS
 
 
-def main(exchange_number: int = 1):
+def main(exchange_number: int = 2):
     stock_exchange = exchange_number
 
     match (stock_exchange, scope):
@@ -104,9 +105,9 @@ def main(exchange_number: int = 1):
             stock = ticker_data["stock"]
             price = float(ticker_data["price"])
             options = ticker_data["options"]
-            sector = ticker_data["sector"]
-            industry = ticker_data["industry"]
-            beta = float(ticker_data["beta"])
+            sector = functions.normalize_nullable_fields(ticker_data["sector"])
+            industry = functions.normalize_nullable_fields(ticker_data["industry"])
+            beta = functions.normalize_nullable_fields(float(ticker_data["beta"]))
             # vol_aver_10days = ticker_data["vol_aver_10days"]
             # vol_aver_3months = ticker_data["vol_aver_3months"]
 
@@ -168,6 +169,7 @@ def main(exchange_number: int = 1):
                             continue
                         else:
                             for contract in best_contracts:
+                                print("Match!")
                                 all_best_contracts.append(contract)
 
                     # put options
@@ -197,14 +199,45 @@ def main(exchange_number: int = 1):
                             continue
                         else:
                             for contract in best_contracts:
+                                print("Match!")
                                 all_best_contracts.append(contract)
 
                     # spread options
-                    elif year == i_year and month in l_month and day in l_day and option_no == 2:
-                        pass
+                    elif year == i_year and \
+                            month in l_month and \
+                            day in l_day and \
+                            option_no == 2 and \
+                            len(options) > 10:  # this incluides only weekly options
+                        try:
+                            best_contracts = spread_options.scan_spread_options(
+                                ticker,
+                                exchanges[stock_exchange],
+                                d,
+                                min_bid_price,
+                                stock,
+                                price,
+                                sector,
+                                industry,
+                                beta,
+                                lowest_price,
+                                highest_price,
+                                avg_price,
+                                avg_price_7d,
+                                avg_price_30d,
+                                trend,
+                                rel_std_deviation)
+                        except Exception as e:
+                            continue
+
+                        if len(best_contracts) == 0:
+                            continue
+                        else:
+                            for contract in best_contracts:
+                                print("Match!")
+                                all_best_contracts.append(contract)
 
             else:
-                print(" option len is 0")
+                print("options len is 0")
 
     # ARCA
     elif stock_exchange == 2:
@@ -240,7 +273,6 @@ def main(exchange_number: int = 1):
             trend = price_data["price_trend"]
             # abs_std_deviation = price_data["abs_sd"]
             rel_std_deviation = price_data["rel_sd"]
-            print(rel_std_deviation)
 
             if rel_std_deviation > std_dev_threshold:
                 continue
@@ -279,6 +311,7 @@ def main(exchange_number: int = 1):
                             continue
                         else:
                             for contract in best_contracts:
+                                print("Match!")
                                 all_best_contracts.append(contract)
 
                     # put options
@@ -305,20 +338,54 @@ def main(exchange_number: int = 1):
                             continue
                         else:
                             for contract in best_contracts:
+                                print("Match!")
                                 all_best_contracts.append(contract)
-
                     # spread options
-                    elif year == i_year and month in l_month and day in l_day and option_no == 2:
-                        pass
+                    elif year == i_year and \
+                            month in l_month and \
+                            day in l_day and \
+                            option_no == 2 and \
+                            len(options) > 10:  # this includes only weekly options
+
+                        try:
+                            best_contracts = spread_options.scan_etf_spread_options(
+                                ticker,
+                                exchanges[stock_exchange],
+                                d,
+                                min_bid_price,
+                                stock,
+                                price,
+                                lowest_price,
+                                highest_price,
+                                avg_price,
+                                avg_price_7d,
+                                avg_price_30d,
+                                trend,
+                                rel_std_deviation)
+                        except Exception as e:
+                            continue
+
+                        if len(best_contracts) == 0:
+                            continue
+                        else:
+                            for contract in best_contracts:
+                                print("Match!")
+                                all_best_contracts.append(contract)
 
             else:
                 print("option len is 0")
 
-    all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["ratio_bid_strike"], reverse=True)
+    all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["option_yield"], reverse=True)
     print(f"Tot. number of contracts: {len(all_best_contracts_sorted)}")
     print()
 
-    # print list with stocks having options?
+    # write list of tickers with options
+    if stock_exchange == 0:
+        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nyse.txt")
+    elif stock_exchange == 1:
+        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nasdaq.txt")
+    elif stock_exchange == 2:
+        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_arca.txt")
 
     # write NYSE covered calls
     if stock_exchange == 0 and option_no == 0:
@@ -328,6 +395,12 @@ def main(exchange_number: int = 1):
     # write NYSE put options
     if stock_exchange == 0 and option_no == 1:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_put_options_nyse.json",
+                                             0,
+                                             all_best_contracts_sorted)
+
+    # write NYSE spread options
+    if stock_exchange == 0 and option_no == 2:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_spreads_nyse.json",
                                              0,
                                              all_best_contracts_sorted)
 
@@ -341,6 +414,13 @@ def main(exchange_number: int = 1):
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_put_options_nasdaq.json",
                                              1,
                                              all_best_contracts_sorted)
+
+    # write NASDAQ spread options
+    elif stock_exchange == 1 and option_no == 2:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_spreads_nasdaq.json",
+                                             1,
+                                             all_best_contracts_sorted)
+
     # write ARCA covered calls
     elif stock_exchange == 2 and option_no == 0:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_cov_calls_arca.json",
@@ -349,6 +429,12 @@ def main(exchange_number: int = 1):
     # write ARCA put options
     elif stock_exchange == 2 and option_no == 1:
         functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_put_options_arca.json",
+                                             2,
+                                             all_best_contracts_sorted)
+
+    # write ARCA spread options
+    elif stock_exchange == 2 and option_no == 2:
+        functions.write_best_options_to_json("/Users/madararubino/options-saas/shared/data/best_spreads_arca.json",
                                              2,
                                              all_best_contracts_sorted)
 
