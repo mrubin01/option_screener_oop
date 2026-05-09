@@ -65,7 +65,7 @@ def scan_put_options(
 
             spread_bid_ask = round(row.ask - row.bid, 2)
             spread_strike_price = round(abs(row.strike - current_price), 2)
-            delta_price_premium = round(abs(row.strike - current_price + row.bid), 2)
+            delta_price_premium = row.bid   # different from cov calls
             break_even = round(current_price - row.bid, 2)
 
             if spread_bid_ask is None or spread_bid_ask == "" or (isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask)):
@@ -84,7 +84,7 @@ def scan_put_options(
             days_to_expiration = functions.days_to_expiration(option_date)
             est_delta = functions.estimate_delta("put", current_price, row.strike, days_to_expiration, 3.68, row.impliedVolatility)
 
-            option_yield =  round((row.bid / row.strike) * 100, 2)
+            option_yield = round((row.bid / row.strike) * 100, 2)
             annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
             tot_return = round((row.bid / current_price) * 100, 2)
 
@@ -100,7 +100,7 @@ def scan_put_options(
                 "contract": row.contractSymbol,
                 "expiry_date": option_date,
                 "days_to_expiration": days_to_expiration,
-                "current_price": current_price,
+                "current_price": round(current_price, 2),
                 "coeff_variation": rel_std_deviation,
                 "max_profit": round(float(delta_price_premium), 2),
                 "max_profit_per_contract": round(float(delta_price_premium * 100), 2),
@@ -186,7 +186,7 @@ def scan_etf_put_options(
 
             spread_bid_ask = round(row.ask - row.bid, 2)
             spread_strike_price = round(abs(row.strike - current_price), 2)
-            delta_price_premium = round(abs(row.strike - current_price + row.bid), 2)
+            delta_price_premium = row.bid  # different from cov calls
             break_even = round(current_price - row.bid, 2)
 
             if spread_bid_ask is None or spread_bid_ask == "" or (isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask)):
@@ -221,7 +221,7 @@ def scan_etf_put_options(
                 "contract": row.contractSymbol,
                 "expiry_date": option_date,
                 "days_to_expiration": days_to_expiration,
-                "current_price": current_price,
+                "current_price": round(current_price, 2),
                 "coeff_variation": rel_std_deviation,
                 "max_profit": round(float(delta_price_premium), 2),
                 "max_profit_per_contract": round(float(delta_price_premium * 100), 2),

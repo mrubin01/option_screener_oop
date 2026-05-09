@@ -50,10 +50,22 @@ Each of the three modules covered_calls.py, put_options.py, spread_options.py wi
 The function will return a list containing a dictionary for every contract that has passed the following filters:
 1. spread_bid_ask, spread_strike_price, delta_price_premium and option_yield must not be empty or null
 2. the bid per share (premium) must be equal or higher than the MIN_BID_PRICE;
-3. spread_strike_price must be below 20;
-4. option_yield must be below 25
+3. the strike price must be higher than the current_price
+4. spread_strike_price must be below 20;
+5. option_yield must be below 25
 
 ### Put options  
+The function will return a list containing a dictionary for every contract that has passed the following filters:
+1. spread_bid_ask, spread_strike_price, delta_price_premium and option_yield must not be empty or null
+2. the bid per share (premium) must be equal or higher than the MIN_BID_PRICE;
+3. the strike price must be lower than the current_price --> different from cov calls
+4. spread_strike_price must be below 20;
+5. option_yield must be below 25
+
+Some metrics have different formulas compared to covered calls:  
+max_profit, max_profit_per_contract  
+option_yield, roc  
+tot_return
 
 
 ### Spread options  

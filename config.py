@@ -1,6 +1,6 @@
 # global variables
 TEST = False
-TYPE = 0  # 0 call, 1 put, 2 spread
+TYPE = 1  # 0 call, 1 put, 2 spread
 STOCK_EXCHANGE = 2  # nyse, nasdaq, arca
 TREND = -1  # -1 no trend, 0 downtrend, 1 uptrend
 if STOCK_EXCHANGE in [0, 1]:
