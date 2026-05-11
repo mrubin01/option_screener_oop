@@ -79,9 +79,9 @@ def estimate_delta(
     r = normalize_rate(risk_free_rate)
     sigma = normalize_iv(impl_volatility)
 
-    if strategy in ["covered_call", "cc", "call"]:
+    if strategy in ["covered_call", "cc", "call", "calls", "c"]:
         option_type = "c"
-    elif strategy in ["cash_secured_put", "csp", "put"]:
+    elif strategy in ["cash_secured_put", "csp", "put", "puts", "p"]:
         option_type = "p"
     else:
         raise ValueError(

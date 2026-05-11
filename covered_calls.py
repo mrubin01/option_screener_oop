@@ -74,15 +74,14 @@ def scan_covered_calls(
             if spread_strike_price is None or \
                     spread_strike_price == "" or \
                     (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                    spread_strike_price < config.STRIKE_PRICE_THRESHOLD or \
-                    spread_strike_price > 20:
+                    spread_strike_price >= config.STRIKE_PRICE_THRESHOLD:
                 continue
 
             if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
                 continue
 
             days_to_expiration = functions.days_to_expiration(option_date)
-            est_delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, 3.68, row.impliedVolatility)
+            est_delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, config.RISK_FREE_RATE, row.impliedVolatility)
 
             option_yield = round((row.bid / current_price) * 100, 2)
             annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
@@ -90,7 +89,7 @@ def scan_covered_calls(
 
             if option_yield is None or \
                     option_yield == "" or \
-                    option_yield > 25 or \
+                    option_yield >= config.OPTION_YIELD_THRESHOLD or \
                     (isinstance(option_yield, float) and math.isnan(option_yield)):
                 continue
 
@@ -193,15 +192,14 @@ def scan_etf_covered_calls(
             if spread_strike_price is None or \
                     spread_strike_price == "" or \
                     (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                    spread_strike_price < config.STRIKE_PRICE_THRESHOLD or \
-                    spread_strike_price > 20:
+                    spread_strike_price >= config.STRIKE_PRICE_THRESHOLD:
                 continue
 
             if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
                 continue
 
             days_to_expiration = functions.days_to_expiration(option_date)
-            est_delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, 3.68, row.impliedVolatility)
+            est_delta = functions.estimate_delta("cc", current_price, row.strike, days_to_expiration, config.RISK_FREE_RATE, row.impliedVolatility)
 
             option_yield = round((row.bid / current_price) * 100, 2)
             annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
@@ -209,7 +207,7 @@ def scan_etf_covered_calls(
 
             if option_yield is None or \
                     option_yield == "" or \
-                    option_yield > 25 or \
+                    option_yield >= config.OPTION_YIELD_THRESHOLD or \
                     (isinstance(option_yield, float) and math.isnan(option_yield)):
                 continue
 
