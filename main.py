@@ -83,7 +83,7 @@ def main(exchange_number: int = 2):
     data = my_file.read()
     data_into_list = data.replace('\n', ', ').split(", ")
     ticker_list = list(filter(None, data_into_list))
-    # ticker_list = ["ABEV", "ABR", "ACI"]
+    # ticker_list = ["XBI", "UPRO", "GDXJ"]
 
     tickers_with_options = []
     all_best_contracts = []
@@ -215,8 +215,6 @@ def main(exchange_number: int = 2):
                             option_no == 2 and \
                             len(options) > 10 and \
                             has_long_itm_options:
-
-                        print("Both long and short calls are ok")
 
                         try:
                             best_contracts = spread_options.scan_spread_options(

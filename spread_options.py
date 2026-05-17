@@ -12,12 +12,10 @@ def scan_long_cov_calls(
         stock_to_check,
         stock_price
 ):
-    print(options)
 
     for d in options:
         """ It returns True if at least one long call has a consistent spread between price and strike"""
         new_date = datetime.strptime(d, "%Y-%m-%d")
-        print(d)
         has_long_calls = functions.is_at_least_3_months_after_today(d)
         if not has_long_calls:
             continue
@@ -33,12 +31,9 @@ def scan_long_cov_calls(
             if row.strike >= stock_price:
                 continue
 
-            print(row.strike, stock_price)
-
             spread_strike_price = round(abs(row.strike - stock_price), 2)
 
             if spread_strike_price >= 6:
-                print(f"This is good: {row}")
                 return True
 
         return False

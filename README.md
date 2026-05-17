@@ -8,6 +8,12 @@ CoV < 2 LOW, CoV < 5 MODERATE, CoV >= 5 HIGH, CoV >= 10 VERY HIGH
 
 A CoV < 5% means low volatility. However, a value below 10% restrict the number of contracts that will be selected
 
+Moneyness or OTM distance is the % the stock needs to drop (puts) or to rise (calls, spreads) to reach the strike  
+
+Sigma Distance to strike in volatility units: how many implied STD_DEV the current price is away from the option’s strike 
+over the remaining DTE to avoid assignment; the higher the SD, the better: 0-0.5 very close, 0.5-1 close, 1-1.5 moderate, 
+1.5-2.0 high, 2-3.0 very high
+
 ### main()  
 In the main for the object ticker, equity or ETF, there are four checks: price data, price stats, standard deviation vs threshold  
 and price vs threshold. This happens before calling the option function: if the code is not stopped by these checks,  
@@ -21,6 +27,8 @@ Fields:
 "days_to_expiration"			
 "current_price"
 "strike_price"
+"moneyness"
+"sigma_distance"
 "otm"
 "coeff_variation"	
 "max_profit"			
@@ -43,8 +51,8 @@ Fields:
 "main_trend"
 "beta"					    nullable
 
-Each of the three modules covered_calls.py, put_options.py, spread_options.py will return a dictionary with 28 (equity) or 
-25 (ETF) items. 
+Each of the three modules covered_calls.py, put_options.py, spread_options.py will return a dictionary with 30 (equity) or 
+27 (ETF) items. 
 
 ### Covered calls
 The function will return a list containing a dictionary for every contract that has passed the following filters:
@@ -66,6 +74,7 @@ Some metrics have different formulas compared to covered calls:
 max_profit, max_profit_per_contract  
 option_yield, roc  
 tot_return
+moneyness
 
 
 ### Spread options  
