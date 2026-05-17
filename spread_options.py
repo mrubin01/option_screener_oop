@@ -4,6 +4,44 @@ from typing import Any
 import config
 import math
 import functions
+from datetime import date, datetime
+
+
+def scan_long_cov_calls(
+        options,
+        stock_to_check,
+        stock_price
+):
+    print(options)
+
+    for d in options:
+        """ It returns True if at least one long call has a consistent spread between price and strike"""
+        new_date = datetime.strptime(d, "%Y-%m-%d")
+        print(d)
+        has_long_calls = functions.is_at_least_3_months_after_today(d)
+        if not has_long_calls:
+            continue
+
+        try:
+            spreads = stock_to_check.option_chain(d).calls
+        except Exception as e:
+            # log and return empty list
+            return False
+
+        for row in spreads.itertuples(index=False):
+
+            if row.strike >= stock_price:
+                continue
+
+            print(row.strike, stock_price)
+
+            spread_strike_price = round(abs(row.strike - stock_price), 2)
+
+            if spread_strike_price >= 6:
+                print(f"This is good: {row}")
+                return True
+
+        return False
 
 
 def scan_spread_options(
@@ -75,7 +113,7 @@ def scan_spread_options(
             if spread_strike_price is None or \
                     spread_strike_price == "" or \
                     (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                    spread_strike_price >= config.STRIKE_PRICE_THRESHOLD:
+                    spread_strike_price <= config.STRIKE_PRICE_THRESHOLD:
                 continue
 
             if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
@@ -198,7 +236,7 @@ def scan_etf_spread_options(
             if spread_strike_price is None or \
                     spread_strike_price == "" or \
                     (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                    spread_strike_price >= config.STRIKE_PRICE_THRESHOLD:
+                    spread_strike_price <= config.STRIKE_PRICE_THRESHOLD:
                 continue
 
             if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):

@@ -9,6 +9,24 @@ import pandas as pd
 import math
 from py_vollib.black_scholes.greeks.analytical import delta
 from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+from datetime import date, datetime
+
+
+def is_at_least_3_months_after_today(date_string: str) -> bool:
+    """
+    Returns True if date_string is at least 3 months after today.
+
+    Example:
+    today = 2026-05-11
+    date_string = "2026-08-02" -> True
+    date_string = "2026-07-30" -> False
+    """
+
+    other_date = datetime.strptime(date_string, "%Y-%m-%d").date()
+    three_months_from_today = date.today() + relativedelta(months=3)
+
+    return other_date >= three_months_from_today
 
 
 def days_to_expiration(expiration_date: str, today: date | None = None) -> int:

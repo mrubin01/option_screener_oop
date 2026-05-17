@@ -7,7 +7,7 @@ if STOCK_EXCHANGE in [0, 1]:
     MAX_STOCK_PRICE = 50
 else:
     MAX_STOCK_PRICE = 200
-YEAR, MONTH, DAY = 2026, [5], [8, 15]  # 2026, [2], [6, 13, 20, 27]  # 2025, [11], [14]  #
+YEAR, MONTH, DAY = 2026, [5], [15, 22]  # 2026, [2], [6, 13, 20, 27]  # 2025, [11], [14]  #
 STD_DEV_THRESHOLD = 15
 if STOCK_EXCHANGE in [0, 1]:
     STRIKE_PRICE_THRESHOLD = 1.5
@@ -28,6 +28,10 @@ HAVE_OPTIONS = 0  # 0 no active options, 1 with active options
 TREND_DOWN = -1
 TREND_SIDEWAYS = 0
 TREND_UP = 1
+
+RISK_FREE_RATE = 3.86  # 1-month Treasury rate
+OPTION_YIELD_THRESHOLD = 25
+SPREAD_STRIKE_PRICE_THRESHOLD = 20
 
 if __name__ == "__main__":
     raise RuntimeError("This module is not meant to be run directly")

@@ -136,6 +136,12 @@ def main(exchange_number: int = 2):
                 if t not in tickers_with_options:
                     tickers_with_options.append(t)
 
+                # search for long calls deep ITM: only useful for spreads
+                has_long_itm_options = False
+                if option_no == 2:
+                    has_long_itm_options = spread_options.scan_long_cov_calls(options, stock, price)
+
+
                 for d in options:
                     new_date = datetime.strptime(d, "%Y-%m-%d")
                     day = new_date.day
@@ -202,12 +208,16 @@ def main(exchange_number: int = 2):
                                 print("Match!")
                                 all_best_contracts.append(contract)
 
-                    # spread options
+                    # spread options: last 2 filters imply weekly contract and long calls deep ITM
                     elif year == i_year and \
                             month in l_month and \
                             day in l_day and \
                             option_no == 2 and \
-                            len(options) > 10:  # this incluides only weekly options
+                            len(options) > 10 and \
+                            has_long_itm_options:
+
+                        print("Both long and short calls are ok")
+
                         try:
                             best_contracts = spread_options.scan_spread_options(
                                 ticker,

@@ -74,7 +74,7 @@ def scan_put_options(
             if spread_strike_price is None or \
                     spread_strike_price == "" or \
                     (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                    spread_strike_price >= config.STRIKE_PRICE_THRESHOLD:
+                    spread_strike_price <= config.STRIKE_PRICE_THRESHOLD:
                 continue
 
             if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
@@ -194,7 +194,7 @@ def scan_etf_put_options(
             if spread_strike_price is None or \
                     spread_strike_price == "" or \
                     (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                    spread_strike_price >= config.STRIKE_PRICE_THRESHOLD:
+                    spread_strike_price <= config.STRIKE_PRICE_THRESHOLD:
                 continue
 
             if delta_price_premium is None or delta_price_premium == "" or (isinstance(delta_price_premium, float) and math.isnan(delta_price_premium)):
