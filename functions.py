@@ -13,6 +13,50 @@ from dateutil.relativedelta import relativedelta
 from datetime import date, datetime
 
 
+def sigma_distance_to_strike(
+    current_price: float,
+    strike_price: float,
+    implied_volatility: float,
+    days_left: int,
+    days_in_year: int = 365
+) -> float:
+    """
+    Calculate the sigma distance to strike.
+
+    Parameters
+    ----------
+    current_price : float
+        Current underlying price.
+    strike_price : float
+        Option strike price.
+    implied_volatility : float
+        Annualized IV as a decimal, e.g. 0.40 for 40%.
+    days_left : int
+        Days to expiration.
+    days_in_year : int
+        Use 365 for calendar days, or 252 for trading days.
+
+    Returns
+    -------
+    float
+        Distance to strike in implied standard deviations.
+    """
+    if current_price <= 0:
+        raise ValueError("current_price must be positive.")
+    if strike_price <= 0:
+        raise ValueError("strike_price must be positive.")
+    if implied_volatility <= 0:
+        raise ValueError("implied_volatility must be positive.")
+    if days_left <= 0:
+        raise ValueError("days_to_expiration must be positive.")
+
+    time_to_expiration = days_left / days_in_year
+
+    return (abs(math.log(current_price / strike_price)) / (
+        implied_volatility * math.sqrt(time_to_expiration)) / 100
+    )
+
+
 def is_at_least_3_months_after_today(date_string: str) -> bool:
     """
     Returns True if date_string is at least 3 months after today.
@@ -357,6 +401,8 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "max_profit_per_contract",
             "otm",
             "strike_price",
+            "moneyness",
+            "sigma_distance",
             "bid_per_share",
             "premium_per_contract",
             "spread_bid_ask",
@@ -388,6 +434,8 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "max_profit_per_contract",
             "otm",
             "strike_price",
+            "moneyness",
+            "sigma_distance",
             "bid_per_share",
             "premium_per_contract",
             "spread_bid_ask",
