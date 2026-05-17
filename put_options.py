@@ -87,6 +87,15 @@ def scan_put_options(
             annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
             tot_return = round((row.bid / current_price) * 100, 2)
 
+            # new metrics
+            moneyness = round(((current_price - float(row.strike)) / current_price) * 100, 2)
+            sigma_distance = functions.sigma_distance_to_strike(
+                current_price,
+                float(row.strike),
+                float(row.impliedVolatility) / 100,
+                days_to_expiration
+            )
+
             if option_yield is None or \
                     option_yield == "" or \
                     option_yield >= config.OPTION_YIELD_THRESHOLD or \
@@ -105,6 +114,8 @@ def scan_put_options(
                 "max_profit_per_contract": round(float(delta_price_premium * 100), 2),
                 "otm": round(float(spread_strike_price), 2),
                 "strike_price": round(float(row.strike), 2),
+                "moneyness": round(moneyness, 2),
+                "sigma_distance": round(sigma_distance, 2),
                 "bid_per_share": round(float(row.bid), 2),
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
@@ -207,6 +218,15 @@ def scan_etf_put_options(
             annualized_option_yield = round(option_yield * (365 / days_to_expiration), 2)
             tot_return = round((row.bid / current_price) * 100, 2)
 
+            # new metrics
+            moneyness = round(((current_price - float(row.strike)) / current_price) * 100, 2)
+            sigma_distance = functions.sigma_distance_to_strike(
+                current_price,
+                float(row.strike),
+                float(row.impliedVolatility) / 100,
+                days_to_expiration
+            )
+
             if option_yield is None or \
                     option_yield == "" or \
                     option_yield >= config.OPTION_YIELD_THRESHOLD or \
@@ -225,6 +245,8 @@ def scan_etf_put_options(
                 "max_profit_per_contract": round(float(delta_price_premium * 100), 2),
                 "otm": round(float(spread_strike_price), 2),
                 "strike_price": round(float(row.strike), 2),
+                "moneyness": round(moneyness, 2),
+                "sigma_distance": round(sigma_distance, 2),
                 "bid_per_share": round(float(row.bid), 2),
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
