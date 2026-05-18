@@ -79,4 +79,5 @@ moneyness
 
 ### Spread options  
 Spread options are actually covered calls, but with additional filters: 1 they must be weekly; 2 they must have a  
-spread between the current price and the strike price of at least 1.5
+spread between the current price and the strike price of at least 1.5; 3 they must have good short calls as well as 
+good long calls having an expiration date after at least 3 months
