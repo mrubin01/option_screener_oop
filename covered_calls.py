@@ -8,7 +8,7 @@ import functions
 
 def scan_covered_calls(
     ticker: Assets.Equity,
-    exchange: str,
+    exchange: int,
     option_date: str,
     threshold_bid: float,
     stock: yfinance.Ticker,
@@ -120,7 +120,7 @@ def scan_covered_calls(
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
                 "break_even": break_even,
-                "open_interest": functions.normalize_nullable_fields(row.openInterest),
+                "open_interest": int(functions.normalize_nullable_fields(row.openInterest)),
                 "impl_volatility": round(float(row.impliedVolatility * 100), 2),
                 "option_yield": option_yield,
                 "roc": annualized_option_yield,
@@ -143,7 +143,7 @@ def scan_covered_calls(
 
 def scan_etf_covered_calls(
         ticker: Assets.ETF,
-        exchange: str,
+        exchange: int,
         option_date: str,
         threshold_bid: float,
         stock: yfinance.Ticker,
@@ -249,7 +249,7 @@ def scan_etf_covered_calls(
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
                 "break_even": break_even,
-                "open_interest": functions.normalize_nullable_fields(row.openInterest),
+                "open_interest": int(functions.normalize_nullable_fields(row.openInterest)),
                 "impl_volatility": round(float(row.impliedVolatility * 100), 2),
                 "option_yield": option_yield,
                 "roc": annualized_option_yield,

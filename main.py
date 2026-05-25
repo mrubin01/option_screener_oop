@@ -141,7 +141,6 @@ def main(exchange_number: int = 2):
                 if option_no == 2:
                     has_long_itm_options = spread_options.scan_long_cov_calls(options, stock, price)
 
-
                 for d in options:
                     new_date = datetime.strptime(d, "%Y-%m-%d")
                     day = new_date.day
@@ -153,7 +152,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = cov_calls.scan_covered_calls(
                                 ticker,
-                                exchanges[stock_exchange],
+                                stock_exchange,
                                 d,
                                 min_bid_price,
                                 stock,
@@ -183,7 +182,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = put_options.scan_put_options(
                                 ticker,
-                                exchanges[stock_exchange],
+                                stock_exchange,
                                 d,
                                 min_bid_price,
                                 stock,
@@ -219,7 +218,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = spread_options.scan_spread_options(
                                 ticker,
-                                exchanges[stock_exchange],
+                                stock_exchange,
                                 d,
                                 min_bid_price,
                                 stock,
@@ -300,7 +299,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = cov_calls.scan_etf_covered_calls(
                                 ticker,
-                                exchanges[stock_exchange],
+                                stock_exchange,
                                 d,
                                 min_bid_price,
                                 stock,
@@ -327,7 +326,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = put_options.scan_etf_put_options(
                                 ticker,
-                                exchanges[stock_exchange],
+                                stock_exchange,
                                 d,
                                 min_bid_price,
                                 stock,
@@ -358,7 +357,7 @@ def main(exchange_number: int = 2):
                         try:
                             best_contracts = spread_options.scan_etf_spread_options(
                                 ticker,
-                                exchanges[stock_exchange],
+                                stock_exchange,
                                 d,
                                 min_bid_price,
                                 stock,

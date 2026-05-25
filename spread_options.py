@@ -26,6 +26,9 @@ def scan_long_cov_calls(
             # log and return empty list
             return False
 
+        if spreads is None or spreads.empty:
+            return []
+
         for row in spreads.itertuples(index=False):
 
             if row.strike >= stock_price:
@@ -41,7 +44,7 @@ def scan_long_cov_calls(
 
 def scan_spread_options(
     ticker: Assets.Equity,
-    exchange: str,
+    exchange: int,
     option_date: str,
     threshold_bid: float,
     stock: yfinance.Ticker,
@@ -153,7 +156,7 @@ def scan_spread_options(
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
                 "break_even": break_even,
-                "open_interest": functions.normalize_nullable_fields(row.openInterest),
+                "open_interest": int(functions.normalize_nullable_fields(row.openInterest)),
                 "impl_volatility": round(float(row.impliedVolatility * 100), 2),
                 "option_yield": option_yield,
                 "roc": annualized_option_yield,
@@ -176,7 +179,7 @@ def scan_spread_options(
 
 def scan_etf_spread_options(
         ticker: Assets.ETF,
-        exchange: str,
+        exchange: int,
         option_date: str,
         threshold_bid: float,
         stock: yfinance.Ticker,
@@ -285,7 +288,7 @@ def scan_etf_spread_options(
                 "premium_per_contract": round(float(row.bid * 100), 2),
                 "spread_bid_ask": round(float(spread_bid_ask), 2),
                 "break_even": break_even,
-                "open_interest": functions.normalize_nullable_fields(row.openInterest),
+                "open_interest": int(functions.normalize_nullable_fields(row.openInterest)),
                 "impl_volatility": round(float(row.impliedVolatility * 100), 2),
                 "option_yield": option_yield,
                 "roc": annualized_option_yield,

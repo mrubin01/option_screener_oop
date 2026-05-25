@@ -1,19 +1,19 @@
 # global variables
 TEST = False
-TYPE = 1  # 0 call, 1 put, 2 spread
+TYPE = 2  # 0 call, 1 put, 2 spread
 STOCK_EXCHANGE = 2  # nyse, nasdaq, arca
 TREND = -1  # -1 no trend, 0 downtrend, 1 uptrend
 if STOCK_EXCHANGE in [0, 1]:
     MAX_STOCK_PRICE = 50
 else:
     MAX_STOCK_PRICE = 200
-YEAR, MONTH, DAY = 2026, [5], [15, 22]  # 2026, [2], [6, 13, 20, 27]  # 2025, [11], [14]  #
+YEAR, MONTH, DAY = 2026, [5, 6], [5, 29]  # 2026, [2], [6, 13, 20, 27]  # 2025, [11], [14]  #
 STD_DEV_THRESHOLD = 15
 if STOCK_EXCHANGE in [0, 1]:
     STRIKE_PRICE_THRESHOLD = 1.5
 else:
     STRIKE_PRICE_THRESHOLD = 3
-SCOPE = 0  # 0 only tickers with options, 1 whole ticker list
+SCOPE = 1  # 0 only tickers with options, 1 whole ticker list
 WRITE_TICKERS_TO_FILE = 1
 
 OPTION_TYPE = ["Call", "Put", "Spread"]
