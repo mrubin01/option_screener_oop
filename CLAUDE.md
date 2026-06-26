@@ -40,19 +40,20 @@ The screener iterates over a ticker list, fetches market data via yfinance, appl
 **Module responsibilities:**
 - `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `YEAR/MONTH/DAY`, thresholds). Edit this before each run.
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses wrapping yfinance calls
-- `functions.py` — shared utilities: `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
-- `covered_calls.py` — `scan_covered_calls` / `scan_etf_covered_calls`
-- `put_options.py` — `scan_put_options` / `scan_etf_put_options`
-- `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` / `scan_etf_spread_options`
-- `spread_options_short_calls.py` — standalone script for short-call side of spreads (ARCA only)
+- `functions.py` — shared utilities: `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
+- `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`
+- `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern
+- `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` (alias of `scan_covered_calls` from covered_calls)
+- `spread_options_short_calls.py` — standalone `run()` for the short-call leg of spreads (ARCA/ETF only)
 
 ## Key metrics
 
 - **CoV (coeff_variation)** — relative std dev `(std_dev / avg_price) * 100`; above `STD_DEV_THRESHOLD` (default 15) skips the ticker
-- **Moneyness** — `((strike - current_price) / current_price) * 100`; for puts it measures how far OTM downward
-- **Sigma distance** — implied std devs from current price to strike: `|ln(S/K)| / (IV * sqrt(T/365)) / 100`
-- **option_yield** — `(bid / current_price) * 100`; pivot field for sorting output
+- **Moneyness** — calls/spreads: `((strike - price) / price) * 100`; puts: `((price - strike) / price) * 100`
+- **Sigma distance** — implied std devs from current price to strike: `|ln(S/K)| / (IV * sqrt(T/365))`
+- **option_yield** — calls/spreads: `(bid / price) * 100`; puts: `(bid / strike) * 100`; pivot field for sorting output
 - **roc** — annualized option_yield: `option_yield * (365 / DTE)`
+- **break_even** — calls/spreads: `price - bid`; puts: `strike - bid`
 
 ## Output
 
@@ -66,4 +67,19 @@ JSON files are written to `~/options-saas/shared/data/` with names like `best_co
 | `STOCK_EXCHANGE` | 0=NYSE, 1=NASDAQ, 2=ARCA | Ticker list and asset class used |
 | `YEAR/MONTH/DAY` | lists | Target expiry dates to scan |
 | `SCOPE` | 0=tickers with options only, 1=full list | Input ticker file |
-| `TREND` | -1=any, 0=downtrend, 1=uptrend | Filter by price trend (not enforced in all paths) |
+
+## Known issues
+
+| # | Issue | Severity | Status |
+|---|---|---|---|
+| 1 | `spread_options_short_calls.py` — wrong API, crashes | Critical | Done |
+| 2 | `int(None)` crash on null `openInterest` silently drops contracts | Critical | Open — pending doc review |
+| 3 | `sigma_distance` is 100× too small | Critical | Open — pending doc review |
+| 4 | Put `break_even` uses call formula | Critical | Done |
+| 5 | 6× duplicated scan logic | Non-critical | Done |
+| 6 | All exceptions silently swallowed | Non-critical | Won't fix |
+| 7 | `days_to_expiration()` called per row instead of per expiry | Non-critical | Done (with #5) |
+| 8 | Dead NaN checks on `option_yield` | Non-critical | Done (with #5) |
+| 9 | `config.TREND` never applied as a filter | Non-critical | Done |
+| 10 | Network calls at module level in `main.py` | Non-critical | Done |
+| 11 | Dead `write_best_option_to_file*` functions | Non-critical | Done |
