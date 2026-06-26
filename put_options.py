@@ -51,7 +51,7 @@ def scan_put_options(
         spread_bid_ask = round(row.ask - row.bid, 2)
         spread_strike_price = round(abs(row.strike - current_price), 2)
         delta_price_premium = row.bid
-        break_even = round(current_price - row.bid, 2)
+        break_even = round(row.strike - row.bid, 2)
 
         if isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask):
             continue
