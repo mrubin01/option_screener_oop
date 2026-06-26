@@ -11,38 +11,10 @@ import spread_options
 import spread_options_short_calls
 import covered_calls as cov_calls
 import put_options as put_options
-import sys
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
-
-user_agent = functions.create_user_agent()
-
-# empty the cache only the first run of the day
-CLEAR_CACHE = False
-if CLEAR_CACHE:
-    user_agent.cache.clear()
-
-# Market indexes
-ftse_5d = functions.get_index_change_last5d("^FTSE", "5d")
-dow_jones_5d = functions.get_index_change_last5d("^DJI", "5d")
-ftse_1m = functions.get_index_change_last5d("^FTSE", "1mo")
-dow_jones_1m = functions.get_index_change_last5d("^DJI", "1mo")
-functions.get_vix()
-if ftse_5d > 0:
-    print(f"|-- Index FTSE100 is {ftse_5d}% higher than the last 5 days --|")
-elif ftse_5d < 0:
-    print(f"|-- WARNING: Index FTSE100 is {ftse_5d}% lower than the last 5 days --|")
-if dow_jones_5d > 0:
-    print(f"|-- Index DOW JONES is {dow_jones_5d}% higher than the last 5 days --|")
-elif dow_jones_5d < 0:
-    print(f"|-- WARNING: Index DOW JONES is {dow_jones_5d}% lower than the last 5 days --|")
-
-if ftse_1m < 0 and dow_jones_1m:
-    print(f"|-- WARNING: FTSE100 ({ftse_1m}) and DOW JONES ({dow_jones_1m}) are lower than 30 days ago!!! --|")
-
-print("|--------------------------------------------------------------------------|")
 
 option_no = config.TYPE
 # stock_exchange = config.STOCK_EXCHANGE
@@ -60,6 +32,32 @@ have_options = config.HAVE_OPTIONS
 
 def main(exchange_number: int = 2):
     stock_exchange = exchange_number
+
+    user_agent = functions.create_user_agent()
+    CLEAR_CACHE = False
+    if CLEAR_CACHE:
+        user_agent.cache.clear()
+
+    try:
+        ftse_5d = functions.get_index_change_last5d("^FTSE", "5d")
+        dow_jones_5d = functions.get_index_change_last5d("^DJI", "5d")
+        ftse_1m = functions.get_index_change_last5d("^FTSE", "1mo")
+        dow_jones_1m = functions.get_index_change_last5d("^DJI", "1mo")
+        functions.get_vix()
+        if ftse_5d > 0:
+            print(f"|-- Index FTSE100 is {ftse_5d}% higher than the last 5 days --|")
+        elif ftse_5d < 0:
+            print(f"|-- WARNING: Index FTSE100 is {ftse_5d}% lower than the last 5 days --|")
+        if dow_jones_5d > 0:
+            print(f"|-- Index DOW JONES is {dow_jones_5d}% higher than the last 5 days --|")
+        elif dow_jones_5d < 0:
+            print(f"|-- WARNING: Index DOW JONES is {dow_jones_5d}% lower than the last 5 days --|")
+        if ftse_1m < 0 and dow_jones_1m:
+            print(f"|-- WARNING: FTSE100 ({ftse_1m}) and DOW JONES ({dow_jones_1m}) are lower than 30 days ago!!! --|")
+    except Exception:
+        print("|-- WARNING: could not fetch market index data --|")
+
+    print("|--------------------------------------------------------------------------|")
 
     match (stock_exchange, scope):
         case (0, 0):
