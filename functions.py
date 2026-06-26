@@ -279,6 +279,23 @@ def get_vix():
         print(f"|-- WARNING: Volatility index VIX is {current_vix} --> EXTREMELY HIGH --|")
 
 
+def compute_main_trend(
+    current_price: float,
+    avg_price: float,
+    avg_price_7d: float,
+    avg_price_30d: float,
+    trend: int,
+) -> int:
+    below_all = current_price < avg_price and current_price < avg_price_7d and current_price < avg_price_30d
+    above_all = current_price > avg_price and current_price > avg_price_7d and current_price > avg_price_30d
+
+    if above_all and trend == 1:
+        return 1   # TREND_UP
+    if below_all and trend == 0:
+        return -1  # TREND_DOWN
+    return 0       # TREND_SIDEWAYS
+
+
 def write_tickers_to_file(tickers: list, filename: str):
     """
     Writes a list of tickers to a TXT file, one ticker per line

@@ -157,16 +157,16 @@ def main(exchange_number: int = 2):
                                 min_bid_price,
                                 stock,
                                 price,
-                                sector,
-                                industry,
-                                beta,
                                 lowest_price,
                                 highest_price,
                                 avg_price,
                                 avg_price_7d,
                                 avg_price_30d,
                                 trend,
-                                rel_std_deviation)
+                                rel_std_deviation,
+                                sector=sector,
+                                industry=industry,
+                                beta=beta)
                         except Exception as e:
                             continue
 
@@ -187,16 +187,16 @@ def main(exchange_number: int = 2):
                                 min_bid_price,
                                 stock,
                                 price,
-                                sector,
-                                industry,
-                                beta,
                                 lowest_price,
                                 highest_price,
                                 avg_price,
                                 avg_price_7d,
                                 avg_price_30d,
                                 trend,
-                                rel_std_deviation)
+                                rel_std_deviation,
+                                sector=sector,
+                                industry=industry,
+                                beta=beta)
                         except Exception as e:
                             continue
 
@@ -223,16 +223,16 @@ def main(exchange_number: int = 2):
                                 min_bid_price,
                                 stock,
                                 price,
-                                sector,
-                                industry,
-                                beta,
                                 lowest_price,
                                 highest_price,
                                 avg_price,
                                 avg_price_7d,
                                 avg_price_30d,
                                 trend,
-                                rel_std_deviation)
+                                rel_std_deviation,
+                                sector=sector,
+                                industry=industry,
+                                beta=beta)
                         except Exception as e:
                             continue
 
@@ -297,7 +297,7 @@ def main(exchange_number: int = 2):
                     if year == i_year and month in l_month and day in l_day and option_no == 0:
                         # covered calls
                         try:
-                            best_contracts = cov_calls.scan_etf_covered_calls(
+                            best_contracts = cov_calls.scan_covered_calls(
                                 ticker,
                                 stock_exchange,
                                 d,
@@ -324,7 +324,7 @@ def main(exchange_number: int = 2):
                     # put options
                     elif year == i_year and month in l_month and day in l_day and option_no == 1:
                         try:
-                            best_contracts = put_options.scan_etf_put_options(
+                            best_contracts = put_options.scan_put_options(
                                 ticker,
                                 stock_exchange,
                                 d,
@@ -355,7 +355,7 @@ def main(exchange_number: int = 2):
                             len(options) > 10:  # this includes only weekly options
 
                         try:
-                            best_contracts = spread_options.scan_etf_spread_options(
+                            best_contracts = spread_options.scan_spread_options(
                                 ticker,
                                 stock_exchange,
                                 d,
@@ -387,11 +387,11 @@ def main(exchange_number: int = 2):
     print()
 
     # write list of tickers with options
-    if stock_exchange == 0:
+    if stock_exchange == 0 and scope == 1:
         functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nyse.txt")
-    elif stock_exchange == 1:
+    elif stock_exchange == 1 and scope == 1:
         functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nasdaq.txt")
-    elif stock_exchange == 2:
+    elif stock_exchange == 2 and scope == 1:
         functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_arca.txt")
 
     # write NYSE covered calls
