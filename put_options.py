@@ -73,7 +73,7 @@ def scan_put_options(
         tot_return = round((row.bid / current_price) * 100, 2)
         moneyness = round(((current_price - float(row.strike)) / current_price) * 100, 2)
         sigma_distance = functions.sigma_distance_to_strike(
-            current_price, float(row.strike), float(row.impliedVolatility) / 100, dte
+            current_price, float(row.strike), float(row.impliedVolatility), dte
         )
 
         contract = {

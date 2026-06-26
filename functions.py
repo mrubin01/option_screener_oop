@@ -52,8 +52,8 @@ def sigma_distance_to_strike(
 
     time_to_expiration = days_left / days_in_year
 
-    return (abs(math.log(current_price / strike_price)) / (
-        implied_volatility * math.sqrt(time_to_expiration)) / 100
+    return abs(math.log(current_price / strike_price)) / (
+        implied_volatility * math.sqrt(time_to_expiration)
     )
 
 

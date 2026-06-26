@@ -104,7 +104,7 @@ def run(year_short: int, month_short: list, day_short: list, exchange: int, tick
                 annualized_option_yield = round(option_yield * (365 / dte), 2)
                 tot_return = round(((row.strike - price + row.bid) / price) * 100, 2)
                 sigma_distance = functions.sigma_distance_to_strike(
-                    price, float(row.strike), float(row.impliedVolatility) / 100, dte
+                    price, float(row.strike), float(row.impliedVolatility), dte
                 )
                 est_delta = functions.estimate_delta(
                     "cc", price, row.strike, dte, config.RISK_FREE_RATE, row.impliedVolatility

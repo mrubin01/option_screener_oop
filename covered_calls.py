@@ -73,7 +73,7 @@ def scan_covered_calls(
         tot_return = round(((row.strike - current_price + row.bid) / current_price) * 100, 2)
         moneyness = round(((float(row.strike) - current_price) / current_price) * 100, 2)
         sigma_distance = functions.sigma_distance_to_strike(
-            current_price, float(row.strike), float(row.impliedVolatility) / 100, dte
+            current_price, float(row.strike), float(row.impliedVolatility), dte
         )
 
         contract = {
