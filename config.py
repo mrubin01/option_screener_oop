@@ -2,7 +2,6 @@
 TEST = False
 TYPE = 2  # 0 call, 1 put, 2 spread
 STOCK_EXCHANGE = 2  # nyse, nasdaq, arca
-TREND = -1  # -1 no trend, 0 downtrend, 1 uptrend
 if STOCK_EXCHANGE in [0, 1]:
     MAX_STOCK_PRICE = 50
 else:
@@ -22,7 +21,6 @@ if STOCK_EXCHANGE in [0, 1]:
     MIN_BID_PRICE = 0.2
 else:
     MIN_BID_PRICE = 0.5
-TREND_TYPE = ["downtrend", "uptrend", "no trend"]
 HAVE_OPTIONS = 0  # 0 no active options, 1 with active options
 
 TREND_DOWN = -1

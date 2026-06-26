@@ -46,7 +46,6 @@ print("|------------------------------------------------------------------------
 
 option_no = config.TYPE
 # stock_exchange = config.STOCK_EXCHANGE
-trend_no = config.TREND
 max_stock_price = config.MAX_STOCK_PRICE
 i_year, l_month, l_day = config.YEAR, config.MONTH, config.DAY
 std_dev_threshold = config.STD_DEV_THRESHOLD
@@ -56,7 +55,6 @@ write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
 option_type = config.OPTION_TYPE
 exchanges = config.EXCHANGES
 min_bid_price = config.MIN_BID_PRICE
-trend_type = config.TREND_TYPE
 have_options = config.HAVE_OPTIONS
 
 
