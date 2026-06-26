@@ -8,7 +8,6 @@ import csv
 import Assets
 import config
 import spread_options
-import spread_options_short_calls
 import covered_calls as cov_calls
 import put_options as put_options
 
