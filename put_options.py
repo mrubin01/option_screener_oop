@@ -94,7 +94,7 @@ def scan_put_options(
             "premium_per_contract": round(float(row.bid * 100), 2),
             "spread_bid_ask": round(float(spread_bid_ask), 2),
             "break_even": break_even,
-            "open_interest": int(functions.normalize_nullable_fields(row.openInterest)),
+            "open_interest": int(row.openInterest) if row.openInterest is not None and not (isinstance(row.openInterest, float) and math.isnan(row.openInterest)) else 0,
             "impl_volatility": round(float(row.impliedVolatility * 100), 2),
             "option_yield": option_yield,
             "roc": annualized_option_yield,
