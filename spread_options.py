@@ -28,7 +28,7 @@ def scan_long_cov_calls(
             return False
 
         if spreads is None or spreads.empty:
-            return []
+            return False
 
         for row in spreads.itertuples(index=False):
 
@@ -40,7 +40,7 @@ def scan_long_cov_calls(
             if spread_strike_price >= 6:
                 return True
 
-        return False
+    return False
 
 
 if __name__ == "__main__":
