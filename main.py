@@ -51,7 +51,7 @@ def main(exchange_number: int = 2):
             print(f"|-- Index DOW JONES is {dow_jones_5d}% higher than the last 5 days --|")
         elif dow_jones_5d < 0:
             print(f"|-- WARNING: Index DOW JONES is {dow_jones_5d}% lower than the last 5 days --|")
-        if ftse_1m < 0 and dow_jones_1m:
+        if ftse_1m < 0 and dow_jones_1m < 0:
             print(f"|-- WARNING: FTSE100 ({ftse_1m}) and DOW JONES ({dow_jones_1m}) are lower than 30 days ago!!! --|")
     except Exception:
         print("|-- WARNING: could not fetch market index data --|")
@@ -102,7 +102,7 @@ def main(exchange_number: int = 2):
             options = ticker_data["options"]
             sector = functions.normalize_nullable_fields(ticker_data["sector"])
             industry = functions.normalize_nullable_fields(ticker_data["industry"])
-            beta = functions.normalize_nullable_fields(float(ticker_data["beta"]))
+            beta = functions.normalize_nullable_fields(ticker_data["beta"])
             # vol_aver_10days = ticker_data["vol_aver_10days"]
             # vol_aver_3months = ticker_data["vol_aver_3months"]
 
