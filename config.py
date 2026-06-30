@@ -1,7 +1,7 @@
 # global variables
 TEST = False
-TYPE = 1  # 0 call, 1 put, 2 spread
-STOCK_EXCHANGE = 2  # nyse, nasdaq, arca
+TYPE = 2  # 0 call, 1 put, 2 spread
+STOCK_EXCHANGE = 0  # nyse, nasdaq, arca
 if STOCK_EXCHANGE in [0, 1]:
     MAX_STOCK_PRICE = 50
 else:

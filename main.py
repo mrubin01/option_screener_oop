@@ -29,7 +29,7 @@ min_bid_price = config.MIN_BID_PRICE
 have_options = config.HAVE_OPTIONS
 
 
-def main(exchange_number: int = 2):
+def main(exchange_number: int = 0):
     stock_exchange = exchange_number
 
     user_agent = functions.create_user_agent()
