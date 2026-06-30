@@ -83,15 +83,15 @@ JSON files are written to `~/options-saas/shared/data/` with names like `best_co
 | 9 | `config.TREND` never applied as a filter | Non-critical | Done |
 | 10 | Network calls at module level in `main.py` | Non-critical | Done |
 | 11 | Dead `write_best_option_to_file*` functions | Non-critical | Done |
-| 12 | `main.py:105` — `float(beta)` crashes when yfinance returns `beta=None` | Critical | Open |
-| 13 | `main.py:54` — `dow_jones_1m` used as truthy instead of `< 0`; wrong warning condition | Bug | Open |
-| 14 | `spread_options.py:43` — `return False` inside the for loop; stops after first qualifying date; returns `None` implicitly when no dates qualify | Bug | Open |
-| 15 | `spread_options.py:31` — returns `[]` instead of `False` (wrong type, works by accident) | Bug | Open |
-| 16 | `Assets.py:173` — `float()` called before None check; null guard is dead code | Bug | Open |
-| 17 | `covered_calls.py:45-48` — NaN bid check comes after comparison that passes NaN through (fragile ordering) | Non-critical | Open |
+| 12 | `main.py:105` — `float(beta)` crashes when yfinance returns `beta=None` | Critical | Done |
+| 13 | `main.py:54` — `dow_jones_1m` used as truthy instead of `< 0`; wrong warning condition | Bug | Done |
+| 14 | `spread_options.py:43` — `return False` inside the for loop; stops after first qualifying date; returns `None` implicitly when no dates qualify | Bug | Done |
+| 15 | `spread_options.py:31` — returns `[]` instead of `False` (wrong type, works by accident) | Bug | Done |
+| 16 | `Assets.py:173` — `float()` called before None check; null guard is dead code | Bug | Fixed, pending commit |
+| 17 | `covered_calls.py:45-48` — NaN bid check comes after comparison that passes NaN through (fragile ordering) | Non-critical | Fixed, pending commit |
 | 18 | `main.py:32` — default `exchange_number=2` hardcodes ARCA; ignores `config.STOCK_EXCHANGE` | Non-critical | Open |
 | 19 | `main.py:63-73` — ticker list file handle never closed (no `with` block) | Non-critical | Open |
 | 20 | `spread_options.py:19` — dead `new_date` variable and dead `datetime` import | Non-critical | Open |
 | 21 | `config.py` — `SPREAD_STRIKE_PRICE_THRESHOLD` defined but never referenced | Non-critical | Open |
 | 22 | `Assets.py` — `exchange` property and `get_price_stats` logic duplicated across `Equity` and `ETF` | Architecture | Open |
-| 23 | `functions.py:241` — extra `yf.Ticker().info` call for last price already available in downloaded data | Non-critical | Open |
+| 23 | `functions.py:241` — extra `yf.Ticker().info` call for last price already available in downloaded data | Non-critical | Fixed, pending commit |

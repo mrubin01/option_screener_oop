@@ -169,9 +169,10 @@ class ETF(Asset):
             if not info or not isinstance(info, dict):
                 return {}
 
-            price = float(info["regularMarketPrice"])
+            price = info.get("regularMarketPrice")
             if price is None:
                 return {}
+            price = float(price)
 
             options = stock.options
             if options is None or len(options) == 0:

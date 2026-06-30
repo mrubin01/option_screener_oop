@@ -238,8 +238,8 @@ def create_user_agent():
 def get_index_change_last5d(index_ticker: str, period: str = "5d"):
     data = yf.download(index_ticker, period=period, group_by='column')
     close_prices = data['Close']
-    last_price = get_last_index_price(index_ticker)
     first_price = round(close_prices.iloc[0][index_ticker], 2)
+    last_price = round(close_prices.iloc[-1][index_ticker], 2)
 
     if index_ticker == "^FTSE" or index_ticker == "^DJI":
         change = round(((last_price - first_price) / first_price) * 100, 2)
