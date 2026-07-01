@@ -93,5 +93,5 @@ JSON files are written to `~/options-saas/shared/data/` with names like `best_co
 | 19 | `main.py:63-73` — ticker list file handle never closed (no `with` block) | Non-critical | Done |
 | 20 | `spread_options.py:19` — dead `new_date` variable and dead `datetime` import | Non-critical | Done |
 | 21 | `config.py` — `SPREAD_STRIKE_PRICE_THRESHOLD` defined but never referenced | Non-critical | Done |
-| 22 | `Assets.py` — `exchange` property and `get_price_stats` logic duplicated across `Equity` and `ETF` | Architecture | Open |
+| 22 | `Assets.py` — `exchange` property and `get_price_stats` logic duplicated across `Equity` and `ETF` | Architecture | Done |
 | 23 | `functions.py:241` — extra `yf.Ticker().info` call for last price already available in downloaded data | Non-critical | Done |

@@ -263,7 +263,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if price > max_stock_price:
                 continue
 
-            price_data = ticker.get_price_stats_etf()
+            price_data = ticker.get_price_stats()
             if not price_data:
                 continue
 
