@@ -4,13 +4,11 @@ import yfinance as yf
 import numpy as np
 import requests_cache
 from sklearn.linear_model import LinearRegression
-import csv
 import pandas as pd
 import math
 from py_vollib.black_scholes.greeks.analytical import delta
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
-from datetime import date, datetime
 
 
 def sigma_distance_to_strike(
@@ -248,13 +246,6 @@ def get_index_change_last5d(index_ticker: str, period: str = "5d"):
         print("Wrong Index ticker!")
         sys.exit()
 
-
-def get_last_index_price(index_ticker):
-    data = yf.Ticker(index_ticker)
-    info = data.info
-    current_index = info["regularMarketPrice"]
-
-    return current_index
 
 
 def get_vix():

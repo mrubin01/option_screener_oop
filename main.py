@@ -4,7 +4,6 @@ import functions
 import warnings
 import pandas as pd
 from datetime import datetime
-import csv
 import Assets
 import config
 import spread_options
@@ -15,7 +14,6 @@ warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 
-option_no = config.TYPE
 # stock_exchange = config.STOCK_EXCHANGE
 max_stock_price = config.MAX_STOCK_PRICE
 i_year, l_month, l_day = config.YEAR, config.MONTH, config.DAY
@@ -26,7 +24,6 @@ write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
 option_type = config.OPTION_TYPE
 exchanges = config.EXCHANGES
 min_bid_price = config.MIN_BID_PRICE
-have_options = config.HAVE_OPTIONS
 
 
 def main(exchange_number: int = 0, option_type_input: int | None = None):

@@ -1,5 +1,4 @@
 # global variables
-TEST = False
 TYPE = 2  # 0 call, 1 put, 2 spread
 STOCK_EXCHANGE = 0  # nyse, nasdaq, arca
 if STOCK_EXCHANGE in [0, 1]:
@@ -21,8 +20,6 @@ if STOCK_EXCHANGE in [0, 1]:
     MIN_BID_PRICE = 0.2
 else:
     MIN_BID_PRICE = 0.5
-HAVE_OPTIONS = 0  # 0 no active options, 1 with active options
-
 TREND_DOWN = -1
 TREND_SIDEWAYS = 0
 TREND_UP = 1

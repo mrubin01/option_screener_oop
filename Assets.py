@@ -1,9 +1,4 @@
 import yfinance as yf
-from datetime import datetime
-import requests_cache
-import requests
-import pandas as pd
-import numpy as np
 import functions
 
 
