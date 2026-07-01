@@ -89,7 +89,7 @@ JSON files are written to `~/options-saas/shared/data/` with names like `best_co
 | 15 | `spread_options.py:31` — returns `[]` instead of `False` (wrong type, works by accident) | Bug | Done |
 | 16 | `Assets.py:173` — `float()` called before None check; null guard is dead code | Bug | Done |
 | 17 | `covered_calls.py:45-48` — NaN bid check comes after comparison that passes NaN through (fragile ordering) | Non-critical | Done |
-| 18 | `main.py:32` — default `exchange_number=2` hardcodes ARCA; ignores `config.STOCK_EXCHANGE` | Non-critical | Open |
+| 18 | `main.py:32` — default `exchange_number=2` hardcodes ARCA; ignores `config.STOCK_EXCHANGE` | Non-critical | Done |
 | 19 | `main.py:63-73` — ticker list file handle never closed (no `with` block) | Non-critical | Open |
 | 20 | `spread_options.py:19` — dead `new_date` variable and dead `datetime` import | Non-critical | Open |
 | 21 | `config.py` — `SPREAD_STRIKE_PRICE_THRESHOLD` defined but never referenced | Non-critical | Open |

@@ -29,8 +29,9 @@ min_bid_price = config.MIN_BID_PRICE
 have_options = config.HAVE_OPTIONS
 
 
-def main(exchange_number: int = 0):
+def main(exchange_number: int = 0, option_type_input: int | None = None):
     stock_exchange = exchange_number
+    option_no = option_type_input if option_type_input is not None else config.TYPE
 
     user_agent = functions.create_user_agent()
     CLEAR_CACHE = False
@@ -451,5 +452,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         main(int(sys.argv[1]))
     else:
-        main()
+        print("Option type: 0=calls  1=puts  2=spreads")
+        _opt = int(input(">> "))
+        print("Exchange:    0=NYSE   1=NASDAQ  2=ARCA")
+        _exch = int(input(">> "))
+        main(_exch, _opt)
 
