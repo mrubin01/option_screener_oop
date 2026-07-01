@@ -29,7 +29,6 @@ TREND_UP = 1
 
 RISK_FREE_RATE = 3.86  # 1-month Treasury rate
 OPTION_YIELD_THRESHOLD = 25
-SPREAD_STRIKE_PRICE_THRESHOLD = 20
 
 if __name__ == "__main__":
     raise RuntimeError("This module is not meant to be run directly")
