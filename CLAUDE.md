@@ -59,6 +59,25 @@ The screener iterates over a ticker list, fetches market data via yfinance, appl
 
 JSON files are written to `~/options-saas/shared/data/` with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
 
+## Planned migration: yfinance → Tradier
+
+yfinance is an unofficial reverse-engineered wrapper around Yahoo Finance's undocumented API. Key risks: breaking changes without notice, silent throttling, unpredictable None/NaN fields. The version is pinned at `0.2.59` to avoid breakage.
+
+**Tradier brokerage API** is the planned replacement:
+- Requires a free Tradier brokerage account (no minimum balance)
+- Production tier: **120 requests/minute** (vs ~60 unofficial limit with yfinance)
+- Real-time bid/ask, options chains, open interest from an actual broker feed
+- Stable documented JSON schema — eliminates the None/NaN field surprises
+- Python: use the `tradier` client library or plain `requests`
+- Docs: developer.tradier.com
+
+**Scope of migration when ready:**
+- `Assets.py` — replace `get_info()`, `get_info_etf()` with Tradier quotes endpoint
+- `Assets.py` — replace `get_price_stats()` with Tradier historical data endpoint
+- `covered_calls.py`, `put_options.py` — replace `stock.option_chain(date).calls/puts` with Tradier options chain endpoint
+- `functions.py` — `get_index_change_last5d()` and `get_vix()` may stay on yfinance (index data) or switch to a free alternative
+- `main.py` — minimal changes; consumes dicts from the above methods
+
 ## config.py — what to change per run
 
 | Variable | Values | Effect |
