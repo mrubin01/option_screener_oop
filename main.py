@@ -61,22 +61,23 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
     match (stock_exchange, scope):
         case (0, 0):
-            my_file = open("/Users/madararubino/stocks_with_options_nyse.txt", "r")
+            ticker_file = "/Users/madararubino/stocks_with_options_nyse.txt"
         case (1, 0):
-            my_file = open("/Users/madararubino/stocks_with_options_nasdaq.txt", "r")
+            ticker_file = "/Users/madararubino/stocks_with_options_nasdaq.txt"
         case (2, 0):
-            my_file = open("/Users/madararubino/stocks_with_options_arca.txt", "r")
+            ticker_file = "/Users/madararubino/stocks_with_options_arca.txt"
         case (0, 1):
-            my_file = open("/Users/madararubino/shared_data/nyse_tickers_last.txt", "r")
+            ticker_file = "/Users/madararubino/shared_data/nyse_tickers_last.txt"
         case (1, 1):
-            my_file = open("/Users/madararubino/shared_data/nasdaq_tickers_last.txt", "r")
+            ticker_file = "/Users/madararubino/shared_data/nasdaq_tickers_last.txt"
         case (2, 1):
-            my_file = open("/Users/madararubino/shared_data/nyse_arca_tickers_last.txt")
+            ticker_file = "/Users/madararubino/shared_data/nyse_arca_tickers_last.txt"
         case _:
             print("Wrong values!")
             sys.exit()
 
-    data = my_file.read()
+    with open(ticker_file, "r") as my_file:
+        data = my_file.read()
     data_into_list = data.replace('\n', ', ').split(", ")
     ticker_list = list(filter(None, data_into_list))
     # ticker_list = ["XBI", "UPRO", "GDXJ"]
