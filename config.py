@@ -1,12 +1,22 @@
+from datetime import date, timedelta
+
+
+def _next_n_fridays(n: int) -> list[date]:
+    today = date.today()
+    days_until_friday = (4 - today.weekday()) % 7 or 7
+    first = today + timedelta(days=days_until_friday)
+    return [first + timedelta(weeks=i) for i in range(n)]
+
+
+TARGET_DATES = [d.strftime("%Y-%m-%d") for d in _next_n_fridays(3)]
+
 # global variables
-TEST = False
-TYPE = 1  # 0 call, 1 put, 2 spread
-STOCK_EXCHANGE = 2  # nyse, nasdaq, arca
+TYPE = 2  # 0 call, 1 put, 2 spread
+STOCK_EXCHANGE = 0  # nyse, nasdaq, arca
 if STOCK_EXCHANGE in [0, 1]:
     MAX_STOCK_PRICE = 50
 else:
     MAX_STOCK_PRICE = 200
-YEAR, MONTH, DAY = 2026, [6, 7], [2, 26]  # 2026, [2], [6, 13, 20, 27]  # 2025, [11], [14]  #
 STD_DEV_THRESHOLD = 15
 if STOCK_EXCHANGE in [0, 1]:
     STRIKE_PRICE_THRESHOLD = 1.5
@@ -21,15 +31,12 @@ if STOCK_EXCHANGE in [0, 1]:
     MIN_BID_PRICE = 0.2
 else:
     MIN_BID_PRICE = 0.5
-HAVE_OPTIONS = 0  # 0 no active options, 1 with active options
-
 TREND_DOWN = -1
 TREND_SIDEWAYS = 0
 TREND_UP = 1
 
 RISK_FREE_RATE = 3.86  # 1-month Treasury rate
 OPTION_YIELD_THRESHOLD = 25
-SPREAD_STRIKE_PRICE_THRESHOLD = 20
 
 if __name__ == "__main__":
     raise RuntimeError("This module is not meant to be run directly")

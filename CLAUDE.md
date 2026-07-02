@@ -59,6 +59,25 @@ The screener iterates over a ticker list, fetches market data via yfinance, appl
 
 JSON files are written to `~/options-saas/shared/data/` with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
 
+## Planned migration: yfinance → Tradier
+
+yfinance is an unofficial reverse-engineered wrapper around Yahoo Finance's undocumented API. Key risks: breaking changes without notice, silent throttling, unpredictable None/NaN fields. The version is pinned at `0.2.59` to avoid breakage.
+
+**Tradier brokerage API** is the planned replacement:
+- Requires a free Tradier brokerage account (no minimum balance)
+- Production tier: **120 requests/minute** (vs ~60 unofficial limit with yfinance)
+- Real-time bid/ask, options chains, open interest from an actual broker feed
+- Stable documented JSON schema — eliminates the None/NaN field surprises
+- Python: use the `tradier` client library or plain `requests`
+- Docs: developer.tradier.com
+
+**Scope of migration when ready:**
+- `Assets.py` — replace `get_info()`, `get_info_etf()` with Tradier quotes endpoint
+- `Assets.py` — replace `get_price_stats()` with Tradier historical data endpoint
+- `covered_calls.py`, `put_options.py` — replace `stock.option_chain(date).calls/puts` with Tradier options chain endpoint
+- `functions.py` — `get_index_change_last5d()` and `get_vix()` may stay on yfinance (index data) or switch to a free alternative
+- `main.py` — minimal changes; consumes dicts from the above methods
+
 ## config.py — what to change per run
 
 | Variable | Values | Effect |
@@ -73,8 +92,8 @@ JSON files are written to `~/options-saas/shared/data/` with names like `best_co
 | # | Issue | Severity | Status |
 |---|---|---|---|
 | 1 | `spread_options_short_calls.py` — wrong API, crashes | Critical | Done |
-| 2 | `int(None)` crash on null `openInterest` silently drops contracts | Critical | Open — pending doc review |
-| 3 | `sigma_distance` is 100× too small | Critical | Open — pending doc review |
+| 2 | `int(None)` crash on null `openInterest` silently drops contracts | Critical | Done |
+| 3 | `sigma_distance` is 100× too small | Critical | Done |
 | 4 | Put `break_even` uses call formula | Critical | Done |
 | 5 | 6× duplicated scan logic | Non-critical | Done |
 | 6 | All exceptions silently swallowed | Non-critical | Won't fix |
@@ -83,3 +102,27 @@ JSON files are written to `~/options-saas/shared/data/` with names like `best_co
 | 9 | `config.TREND` never applied as a filter | Non-critical | Done |
 | 10 | Network calls at module level in `main.py` | Non-critical | Done |
 | 11 | Dead `write_best_option_to_file*` functions | Non-critical | Done |
+| 12 | `main.py:105` — `float(beta)` crashes when yfinance returns `beta=None` | Critical | Done |
+| 13 | `main.py:54` — `dow_jones_1m` used as truthy instead of `< 0`; wrong warning condition | Bug | Done |
+| 14 | `spread_options.py:43` — `return False` inside the for loop; stops after first qualifying date; returns `None` implicitly when no dates qualify | Bug | Done |
+| 15 | `spread_options.py:31` — returns `[]` instead of `False` (wrong type, works by accident) | Bug | Done |
+| 16 | `Assets.py:173` — `float()` called before None check; null guard is dead code | Bug | Done |
+| 17 | `covered_calls.py:45-48` — NaN bid check comes after comparison that passes NaN through (fragile ordering) | Non-critical | Done |
+| 18 | `main.py:32` — default `exchange_number=2` hardcodes ARCA; ignores `config.STOCK_EXCHANGE` | Non-critical | Done |
+| 19 | `main.py:63-73` — ticker list file handle never closed (no `with` block) | Non-critical | Done |
+| 20 | `spread_options.py:19` — dead `new_date` variable and dead `datetime` import | Non-critical | Done |
+| 21 | `config.py` — `SPREAD_STRIKE_PRICE_THRESHOLD` defined but never referenced | Non-critical | Done |
+| 22 | `Assets.py` — `exchange` property and `get_price_stats` logic duplicated across `Equity` and `ETF` | Architecture | Done |
+| 23 | `functions.py:241` — extra `yf.Ticker().info` call for last price already available in downloaded data | Non-critical | Done |
+| 24 | `spread_options_short_calls.py:54` — `get_price_stats_etf()` called but removed by #22 refactor; crashes at runtime | Critical | Open |
+| 25 | `functions.py:159` — `normalize_nullable_fields()` returns `str`, so `beta` in contracts is a string not a float | Bug | Open |
+| 26 | `main.py:455` — interactive prompts have no input validation; invalid input crashes or passes wrong value | Bug | Open |
+| 27 | `spread_options_short_calls.py:92` — hardcoded `1.5` threshold instead of `config.STRIKE_PRICE_THRESHOLD` (3 for ARCA) | Bug | Open |
+| 28 | `functions.py:13` — duplicate `from datetime import date, datetime` | Non-critical | Done |
+| 29 | `functions.py:252` — `get_last_index_price()` is dead code after #23 fix | Non-critical | Done |
+| 30 | `main.py:18` — `option_no = config.TYPE` at module level shadowed by local in `main()`; dead | Non-critical | Done |
+| 31 | `main.py:29` — `have_options = config.HAVE_OPTIONS` imported but never used | Non-critical | Done |
+| 32 | `main.py:7` — `import csv` unused | Non-critical | Done |
+| 33 | `config.py` — `TEST` and `HAVE_OPTIONS` defined but never referenced | Non-critical | Done |
+| 34 | `Assets.py` — unused imports: `datetime`, `requests_cache`, `requests`, `numpy`, `pandas` | Non-critical | Done |
+| 35 | `functions.py:7` — `import csv` unused | Non-critical | Done |

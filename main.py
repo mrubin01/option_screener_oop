@@ -3,8 +3,6 @@ import time
 import functions
 import warnings
 import pandas as pd
-from datetime import datetime
-import csv
 import Assets
 import config
 import spread_options
@@ -15,10 +13,9 @@ warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 
-option_no = config.TYPE
 # stock_exchange = config.STOCK_EXCHANGE
 max_stock_price = config.MAX_STOCK_PRICE
-i_year, l_month, l_day = config.YEAR, config.MONTH, config.DAY
+target_dates = config.TARGET_DATES
 std_dev_threshold = config.STD_DEV_THRESHOLD
 scope = config.SCOPE
 write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
@@ -26,11 +23,11 @@ write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
 option_type = config.OPTION_TYPE
 exchanges = config.EXCHANGES
 min_bid_price = config.MIN_BID_PRICE
-have_options = config.HAVE_OPTIONS
 
 
-def main(exchange_number: int = 2):
+def main(exchange_number: int = 0, option_type_input: int | None = None):
     stock_exchange = exchange_number
+    option_no = option_type_input if option_type_input is not None else config.TYPE
 
     user_agent = functions.create_user_agent()
     CLEAR_CACHE = False
@@ -51,7 +48,7 @@ def main(exchange_number: int = 2):
             print(f"|-- Index DOW JONES is {dow_jones_5d}% higher than the last 5 days --|")
         elif dow_jones_5d < 0:
             print(f"|-- WARNING: Index DOW JONES is {dow_jones_5d}% lower than the last 5 days --|")
-        if ftse_1m < 0 and dow_jones_1m:
+        if ftse_1m < 0 and dow_jones_1m < 0:
             print(f"|-- WARNING: FTSE100 ({ftse_1m}) and DOW JONES ({dow_jones_1m}) are lower than 30 days ago!!! --|")
     except Exception:
         print("|-- WARNING: could not fetch market index data --|")
@@ -60,22 +57,23 @@ def main(exchange_number: int = 2):
 
     match (stock_exchange, scope):
         case (0, 0):
-            my_file = open("/Users/madararubino/stocks_with_options_nyse.txt", "r")
+            ticker_file = "/Users/madararubino/stocks_with_options_nyse.txt"
         case (1, 0):
-            my_file = open("/Users/madararubino/stocks_with_options_nasdaq.txt", "r")
+            ticker_file = "/Users/madararubino/stocks_with_options_nasdaq.txt"
         case (2, 0):
-            my_file = open("/Users/madararubino/stocks_with_options_arca.txt", "r")
+            ticker_file = "/Users/madararubino/stocks_with_options_arca.txt"
         case (0, 1):
-            my_file = open("/Users/madararubino/shared_data/nyse_tickers_last.txt", "r")
+            ticker_file = "/Users/madararubino/shared_data/nyse_tickers_last.txt"
         case (1, 1):
-            my_file = open("/Users/madararubino/shared_data/nasdaq_tickers_last.txt", "r")
+            ticker_file = "/Users/madararubino/shared_data/nasdaq_tickers_last.txt"
         case (2, 1):
-            my_file = open("/Users/madararubino/shared_data/nyse_arca_tickers_last.txt")
+            ticker_file = "/Users/madararubino/shared_data/nyse_arca_tickers_last.txt"
         case _:
             print("Wrong values!")
             sys.exit()
 
-    data = my_file.read()
+    with open(ticker_file, "r") as my_file:
+        data = my_file.read()
     data_into_list = data.replace('\n', ', ').split(", ")
     ticker_list = list(filter(None, data_into_list))
     # ticker_list = ["XBI", "UPRO", "GDXJ"]
@@ -102,7 +100,7 @@ def main(exchange_number: int = 2):
             options = ticker_data["options"]
             sector = functions.normalize_nullable_fields(ticker_data["sector"])
             industry = functions.normalize_nullable_fields(ticker_data["industry"])
-            beta = functions.normalize_nullable_fields(float(ticker_data["beta"]))
+            beta = functions.normalize_nullable_fields(ticker_data["beta"])
             # vol_aver_10days = ticker_data["vol_aver_10days"]
             # vol_aver_3months = ticker_data["vol_aver_3months"]
 
@@ -137,12 +135,10 @@ def main(exchange_number: int = 2):
                     has_long_itm_options = spread_options.scan_long_cov_calls(options, stock, price)
 
                 for d in options:
-                    new_date = datetime.strptime(d, "%Y-%m-%d")
-                    day = new_date.day
-                    month = new_date.month
-                    year = new_date.year
+                    if d not in target_dates:
+                        continue
 
-                    if year == i_year and month in l_month and day in l_day and option_no == 0:
+                    if option_no == 0:
                         # covered calls
                         try:
                             best_contracts = cov_calls.scan_covered_calls(
@@ -173,7 +169,7 @@ def main(exchange_number: int = 2):
                                 all_best_contracts.append(contract)
 
                     # put options
-                    elif year == i_year and month in l_month and day in l_day and option_no == 1:
+                    elif option_no == 1:
                         try:
                             best_contracts = put_options.scan_put_options(
                                 ticker,
@@ -203,13 +199,7 @@ def main(exchange_number: int = 2):
                                 all_best_contracts.append(contract)
 
                     # spread options: last 2 filters imply weekly contract and long calls deep ITM
-                    elif year == i_year and \
-                            month in l_month and \
-                            day in l_day and \
-                            option_no == 2 and \
-                            len(options) > 10 and \
-                            has_long_itm_options:
-
+                    elif option_no == 2 and len(options) > 10 and has_long_itm_options:
                         try:
                             best_contracts = spread_options.scan_spread_options(
                                 ticker,
@@ -261,7 +251,7 @@ def main(exchange_number: int = 2):
             if price > max_stock_price:
                 continue
 
-            price_data = ticker.get_price_stats_etf()
+            price_data = ticker.get_price_stats()
             if not price_data:
                 continue
 
@@ -284,12 +274,10 @@ def main(exchange_number: int = 2):
                     tickers_with_options.append(t)
 
                 for d in options:
-                    new_date = datetime.strptime(d, "%Y-%m-%d")
-                    day = new_date.day
-                    month = new_date.month
-                    year = new_date.year
+                    if d not in target_dates:
+                        continue
 
-                    if year == i_year and month in l_month and day in l_day and option_no == 0:
+                    if option_no == 0:
                         # covered calls
                         try:
                             best_contracts = cov_calls.scan_covered_calls(
@@ -317,7 +305,7 @@ def main(exchange_number: int = 2):
                                 all_best_contracts.append(contract)
 
                     # put options
-                    elif year == i_year and month in l_month and day in l_day and option_no == 1:
+                    elif option_no == 1:
                         try:
                             best_contracts = put_options.scan_put_options(
                                 ticker,
@@ -342,13 +330,9 @@ def main(exchange_number: int = 2):
                             for contract in best_contracts:
                                 print("Match!")
                                 all_best_contracts.append(contract)
-                    # spread options
-                    elif year == i_year and \
-                            month in l_month and \
-                            day in l_day and \
-                            option_no == 2 and \
-                            len(options) > 10:  # this includes only weekly options
 
+                    # spread options: len(options) > 10 implies weekly contracts
+                    elif option_no == 2 and len(options) > 10:
                         try:
                             best_contracts = spread_options.scan_spread_options(
                                 ticker,
@@ -451,5 +435,8 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         main(int(sys.argv[1]))
     else:
-        main()
-
+        print("Option type: 0=calls  1=puts  2=spreads")
+        _opt = int(input(">> "))
+        print("Exchange:    0=NYSE   1=NASDAQ  2=ARCA")
+        _exch = int(input(">> "))
+        main(_exch, _opt)

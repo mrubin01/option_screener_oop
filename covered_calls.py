@@ -42,10 +42,10 @@ def scan_covered_calls(
     dte = functions.days_to_expiration(option_date)
 
     for row in cc.itertuples(index=False):
-        if row.bid < threshold_bid or row.strike <= current_price:
+        if isinstance(row.bid, float) and math.isnan(row.bid):
             continue
 
-        if isinstance(row.bid, float) and math.isnan(row.bid):
+        if row.bid < threshold_bid or row.strike <= current_price:
             continue
 
         spread_bid_ask = round(row.ask - row.bid, 2)

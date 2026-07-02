@@ -4,7 +4,6 @@ from typing import Any
 import config
 import math
 import functions
-from datetime import date, datetime
 from covered_calls import scan_covered_calls as scan_spread_options
 
 
@@ -16,7 +15,6 @@ def scan_long_cov_calls(
 
     for d in options:
         """ It returns True if at least one long call has a consistent spread between price and strike"""
-        new_date = datetime.strptime(d, "%Y-%m-%d")
         has_long_calls = functions.is_at_least_3_months_after_today(d)
         if not has_long_calls:
             continue
@@ -28,7 +26,7 @@ def scan_long_cov_calls(
             return False
 
         if spreads is None or spreads.empty:
-            return []
+            return False
 
         for row in spreads.itertuples(index=False):
 
@@ -40,7 +38,7 @@ def scan_long_cov_calls(
             if spread_strike_price >= 6:
                 return True
 
-        return False
+    return False
 
 
 if __name__ == "__main__":
