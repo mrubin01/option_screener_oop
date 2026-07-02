@@ -3,7 +3,6 @@ import time
 import functions
 import warnings
 import pandas as pd
-from datetime import datetime
 import Assets
 import config
 import spread_options
@@ -16,7 +15,7 @@ pd.set_option("display.max_rows", None)
 
 # stock_exchange = config.STOCK_EXCHANGE
 max_stock_price = config.MAX_STOCK_PRICE
-i_year, l_month, l_day = config.YEAR, config.MONTH, config.DAY
+target_dates = config.TARGET_DATES
 std_dev_threshold = config.STD_DEV_THRESHOLD
 scope = config.SCOPE
 write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
@@ -136,12 +135,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                     has_long_itm_options = spread_options.scan_long_cov_calls(options, stock, price)
 
                 for d in options:
-                    new_date = datetime.strptime(d, "%Y-%m-%d")
-                    day = new_date.day
-                    month = new_date.month
-                    year = new_date.year
+                    if d not in target_dates:
+                        continue
 
-                    if year == i_year and month in l_month and day in l_day and option_no == 0:
+                    if option_no == 0:
                         # covered calls
                         try:
                             best_contracts = cov_calls.scan_covered_calls(
@@ -172,7 +169,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 all_best_contracts.append(contract)
 
                     # put options
-                    elif year == i_year and month in l_month and day in l_day and option_no == 1:
+                    elif option_no == 1:
                         try:
                             best_contracts = put_options.scan_put_options(
                                 ticker,
@@ -202,13 +199,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 all_best_contracts.append(contract)
 
                     # spread options: last 2 filters imply weekly contract and long calls deep ITM
-                    elif year == i_year and \
-                            month in l_month and \
-                            day in l_day and \
-                            option_no == 2 and \
-                            len(options) > 10 and \
-                            has_long_itm_options:
-
+                    elif option_no == 2 and len(options) > 10 and has_long_itm_options:
                         try:
                             best_contracts = spread_options.scan_spread_options(
                                 ticker,
@@ -283,12 +274,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                     tickers_with_options.append(t)
 
                 for d in options:
-                    new_date = datetime.strptime(d, "%Y-%m-%d")
-                    day = new_date.day
-                    month = new_date.month
-                    year = new_date.year
+                    if d not in target_dates:
+                        continue
 
-                    if year == i_year and month in l_month and day in l_day and option_no == 0:
+                    if option_no == 0:
                         # covered calls
                         try:
                             best_contracts = cov_calls.scan_covered_calls(
@@ -316,7 +305,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 all_best_contracts.append(contract)
 
                     # put options
-                    elif year == i_year and month in l_month and day in l_day and option_no == 1:
+                    elif option_no == 1:
                         try:
                             best_contracts = put_options.scan_put_options(
                                 ticker,
@@ -341,13 +330,9 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             for contract in best_contracts:
                                 print("Match!")
                                 all_best_contracts.append(contract)
-                    # spread options
-                    elif year == i_year and \
-                            month in l_month and \
-                            day in l_day and \
-                            option_no == 2 and \
-                            len(options) > 10:  # this includes only weekly options
 
+                    # spread options: len(options) > 10 implies weekly contracts
+                    elif option_no == 2 and len(options) > 10:
                         try:
                             best_contracts = spread_options.scan_spread_options(
                                 ticker,
@@ -455,4 +440,3 @@ if __name__ == "__main__":
         print("Exchange:    0=NYSE   1=NASDAQ  2=ARCA")
         _exch = int(input(">> "))
         main(_exch, _opt)
-
