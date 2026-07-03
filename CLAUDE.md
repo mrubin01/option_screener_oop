@@ -84,7 +84,7 @@ yfinance is an unofficial reverse-engineered wrapper around Yahoo Finance's undo
 |---|---|---|
 | `TYPE` | 0=call, 1=put, 2=spread | Which option module runs |
 | `STOCK_EXCHANGE` | 0=NYSE, 1=NASDAQ, 2=ARCA | Ticker list and asset class used |
-| `YEAR/MONTH/DAY` | lists | Target expiry dates to scan |
+| `TARGET_DATES` | auto-computed | Next 3 Fridays from today; no manual edit needed |
 | `SCOPE` | 0=tickers with options only, 1=full list | Input ticker file |
 
 ## Known issues
@@ -114,10 +114,10 @@ yfinance is an unofficial reverse-engineered wrapper around Yahoo Finance's undo
 | 21 | `config.py` — `SPREAD_STRIKE_PRICE_THRESHOLD` defined but never referenced | Non-critical | Done |
 | 22 | `Assets.py` — `exchange` property and `get_price_stats` logic duplicated across `Equity` and `ETF` | Architecture | Done |
 | 23 | `functions.py:241` — extra `yf.Ticker().info` call for last price already available in downloaded data | Non-critical | Done |
-| 24 | `spread_options_short_calls.py:54` — `get_price_stats_etf()` called but removed by #22 refactor; crashes at runtime | Critical | Open |
+| 24 | `spread_options_short_calls.py:54` — `get_price_stats_etf()` called but removed by #22 refactor; crashes at runtime | Critical | Done (file deleted) |
 | 25 | `functions.py:159` — `normalize_nullable_fields()` returns `str`, so `beta` in contracts is a string not a float | Bug | Open |
 | 26 | `main.py:455` — interactive prompts have no input validation; invalid input crashes or passes wrong value | Bug | Open |
-| 27 | `spread_options_short_calls.py:92` — hardcoded `1.5` threshold instead of `config.STRIKE_PRICE_THRESHOLD` (3 for ARCA) | Bug | Open |
+| 27 | `spread_options_short_calls.py:92` — hardcoded `1.5` threshold instead of `config.STRIKE_PRICE_THRESHOLD` (3 for ARCA) | Bug | Done (file deleted) |
 | 28 | `functions.py:13` — duplicate `from datetime import date, datetime` | Non-critical | Done |
 | 29 | `functions.py:252` — `get_last_index_price()` is dead code after #23 fix | Non-critical | Done |
 | 30 | `main.py:18` — `option_no = config.TYPE` at module level shadowed by local in `main()`; dead | Non-critical | Done |
