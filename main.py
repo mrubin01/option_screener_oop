@@ -432,11 +432,19 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
 
 if __name__ == "__main__":
+    def _ask(prompt: str, valid: tuple) -> int:
+        while True:
+            try:
+                val = int(input(prompt))
+                if val in valid:
+                    return val
+            except ValueError:
+                pass
+            print(f"Invalid input. Enter one of: {valid}")
+
     if len(sys.argv) > 1:
         main(int(sys.argv[1]))
     else:
-        print("Option type: 0=calls  1=puts  2=spreads")
-        _opt = int(input(">> "))
-        print("Exchange:    0=NYSE   1=NASDAQ  2=ARCA")
-        _exch = int(input(">> "))
+        _opt = _ask("Option type  0=calls  1=puts  2=spreads\n>> ", (0, 1, 2))
+        _exch = _ask("Exchange     0=NYSE   1=NASDAQ  2=ARCA\n>> ", (0, 1, 2))
         main(_exch, _opt)
