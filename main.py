@@ -100,7 +100,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             options = ticker_data["options"]
             sector = functions.normalize_nullable_fields(ticker_data["sector"])
             industry = functions.normalize_nullable_fields(ticker_data["industry"])
-            beta = functions.normalize_nullable_fields(ticker_data["beta"])
+            beta = functions.normalize_nullable_float(ticker_data["beta"])
             # vol_aver_10days = ticker_data["vol_aver_10days"]
             # vol_aver_3months = ticker_data["vol_aver_3months"]
 

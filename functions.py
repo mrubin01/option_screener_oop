@@ -168,6 +168,17 @@ def normalize_nullable_fields(value):
     return text
 
 
+def normalize_nullable_float(value) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
 def get_std_dev(ticker: str, price_list: pd.DataFrame | pd.Series) -> list[float]:
     """
     Starting from a DataFrame/Series of stock prices, calculate the absolute
