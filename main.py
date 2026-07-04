@@ -39,30 +39,6 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     stock_exchange = exchange_number
     option_no = option_type_input if option_type_input is not None else config.TYPE
 
-    user_agent = functions.create_user_agent()
-    CLEAR_CACHE = False
-    if CLEAR_CACHE:
-        user_agent.cache.clear()
-
-    try:
-        ftse_5d = functions.get_index_change_last5d("^FTSE", "5d")
-        dow_jones_5d = functions.get_index_change_last5d("^DJI", "5d")
-        ftse_1m = functions.get_index_change_last5d("^FTSE", "1mo")
-        dow_jones_1m = functions.get_index_change_last5d("^DJI", "1mo")
-        functions.get_vix()
-        if ftse_5d > 0:
-            print(f"|-- Index FTSE100 is {ftse_5d}% higher than the last 5 days --|")
-        elif ftse_5d < 0:
-            print(f"|-- WARNING: Index FTSE100 is {ftse_5d}% lower than the last 5 days --|")
-        if dow_jones_5d > 0:
-            print(f"|-- Index DOW JONES is {dow_jones_5d}% higher than the last 5 days --|")
-        elif dow_jones_5d < 0:
-            print(f"|-- WARNING: Index DOW JONES is {dow_jones_5d}% lower than the last 5 days --|")
-        if ftse_1m < 0 and dow_jones_1m < 0:
-            print(f"|-- WARNING: FTSE100 ({ftse_1m}) and DOW JONES ({dow_jones_1m}) are lower than 30 days ago!!! --|")
-    except Exception:
-        print("|-- WARNING: could not fetch market index data --|")
-
     print("|--------------------------------------------------------------------------|")
 
     match (stock_exchange, scope):
