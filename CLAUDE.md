@@ -32,19 +32,18 @@ The screener iterates over a ticker list, fetches market data via yfinance, appl
 **Data flow:**
 1. `main.py` reads a ticker list from a hardcoded `.txt` file (path depends on `STOCK_EXCHANGE` and `SCOPE` in `config.py`)
 2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
-3. It calls `.get_info()` / `.get_info_etf()` and `.get_price_stats()` / `.get_price_stats_etf()` — both return dicts or `{}` on failure
+3. It calls `.get_info()` / `.get_info_etf()` and `.get_price_stats()` — both return dicts or `{}` on failure
 4. Pre-filters: price > `MAX_STOCK_PRICE` and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker
-5. The matching option module's `scan_*` function is called for each expiry date matching `(YEAR, MONTH, DAY)` in config
+5. The matching option module's `scan_*` function is called for each expiry date in `config.TARGET_DATES` (auto-computed next 3 Fridays)
 6. Matched contracts (dicts) are collected, sorted by `option_yield` descending, and written to JSON via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
-- `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `YEAR/MONTH/DAY`, thresholds). Edit this before each run.
+- `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `TARGET_DATES`, thresholds). Only `TYPE` and `STOCK_EXCHANGE` need editing before each run; `TARGET_DATES` is auto-computed.
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses wrapping yfinance calls
 - `functions.py` — shared utilities: `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`
 - `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern
 - `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` (alias of `scan_covered_calls` from covered_calls)
-- `spread_options_short_calls.py` — standalone `run()` for the short-call leg of spreads (ARCA/ETF only)
 
 ## Key metrics
 
@@ -58,6 +57,16 @@ The screener iterates over a ticker list, fetches market data via yfinance, appl
 ## Output
 
 JSON files are written to `~/options-saas/shared/data/` with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
+
+## Rollback point
+
+Tag **`pre-alpaca-migration`** (commit `6335d9c`) marks the last stable state before the Alpaca migration. To roll back:
+
+```bash
+git checkout main
+git reset --hard pre-alpaca-migration
+git push --force origin main   # only if broken changes were already pushed
+```
 
 ## Planned migration: yfinance → Tradier
 
@@ -115,8 +124,8 @@ yfinance is an unofficial reverse-engineered wrapper around Yahoo Finance's undo
 | 22 | `Assets.py` — `exchange` property and `get_price_stats` logic duplicated across `Equity` and `ETF` | Architecture | Done |
 | 23 | `functions.py:241` — extra `yf.Ticker().info` call for last price already available in downloaded data | Non-critical | Done |
 | 24 | `spread_options_short_calls.py:54` — `get_price_stats_etf()` called but removed by #22 refactor; crashes at runtime | Critical | Done (file deleted) |
-| 25 | `functions.py:159` — `normalize_nullable_fields()` returns `str`, so `beta` in contracts is a string not a float | Bug | Open |
-| 26 | `main.py:455` — interactive prompts have no input validation; invalid input crashes or passes wrong value | Bug | Open |
+| 25 | `functions.py:159` — `normalize_nullable_fields()` returns `str`, so `beta` in contracts is a string not a float | Bug | Done |
+| 26 | `main.py:455` — interactive prompts have no input validation; invalid input crashes or passes wrong value | Bug | Done |
 | 27 | `spread_options_short_calls.py:92` — hardcoded `1.5` threshold instead of `config.STRIKE_PRICE_THRESHOLD` (3 for ARCA) | Bug | Done (file deleted) |
 | 28 | `functions.py:13` — duplicate `from datetime import date, datetime` | Non-critical | Done |
 | 29 | `functions.py:252` — `get_last_index_price()` is dead code after #23 fix | Non-critical | Done |
