@@ -15,5 +15,6 @@ dependencies:
       - requests
       - yfinance==0.2.59
       - curl-cffi==0.10.0
-      - alpaca-trade-api
+      - alpaca-py
+      - python-dotenv
       - alpha_vantage==2.3.1
