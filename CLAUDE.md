@@ -58,6 +58,16 @@ The screener iterates over a ticker list, fetches market data via yfinance, appl
 
 JSON files are written to `~/options-saas/shared/data/` with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
 
+## Rollback point
+
+Tag **`pre-alpaca-migration`** (commit `6335d9c`) marks the last stable state before the Alpaca migration. To roll back:
+
+```bash
+git checkout main
+git reset --hard pre-alpaca-migration
+git push --force origin main   # only if broken changes were already pushed
+```
+
 ## Planned migration: yfinance → Tradier
 
 yfinance is an unofficial reverse-engineered wrapper around Yahoo Finance's undocumented API. Key risks: breaking changes without notice, silent throttling, unpredictable None/NaN fields. The version is pinned at `0.2.59` to avoid breakage.
