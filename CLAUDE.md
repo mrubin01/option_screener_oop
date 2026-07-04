@@ -25,9 +25,18 @@ pip install py_vollib python-dateutil
 
 Key pinned versions: `yfinance==0.2.59`, `curl-cffi==0.10.0`, Python 3.10.
 
+**Alpaca API keys** — create a `.env` file in the project root (never committed):
+
+```
+ALPACA_API_KEY=your_api_key_here
+ALPACA_SECRET_KEY=your_secret_key_here
+```
+
+Keys are loaded at import time by `alpaca_client.py` via `python-dotenv`. The screener will raise `RuntimeError` on startup if either key is missing.
+
 ## Architecture
 
-The screener iterates over a ticker list, fetches market data via yfinance, applies filters, and writes matching option contracts to JSON files consumed by a separate `options-saas` frontend.
+The screener iterates over a ticker list, fetches market data via Alpaca (price, historical bars, options chain) and yfinance (expiry dates list, sector/industry/beta), applies filters, and writes matching option contracts to JSON files consumed by a separate `options-saas` frontend.
 
 **Data flow:**
 1. `main.py` reads a ticker list from a hardcoded `.txt` file (path depends on `STOCK_EXCHANGE` and `SCOPE` in `config.py`)
@@ -39,8 +48,9 @@ The screener iterates over a ticker list, fetches market data via yfinance, appl
 
 **Module responsibilities:**
 - `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `TARGET_DATES`, thresholds). Only `TYPE` and `STOCK_EXCHANGE` need editing before each run; `TARGET_DATES` is auto-computed.
-- `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses wrapping yfinance calls
-- `functions.py` — shared utilities: `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
+- `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; imported by `Assets.py` and `functions.py`
+- `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
+- `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame), `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`; `get_index_change_last5d` and `get_vix` still use yfinance (display-only)
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`
 - `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern
 - `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` (alias of `scan_covered_calls` from covered_calls)
@@ -68,24 +78,21 @@ git reset --hard pre-alpaca-migration
 git push --force origin main   # only if broken changes were already pushed
 ```
 
-## Planned migration: yfinance → Tradier
+## Data sources
 
-yfinance is an unofficial reverse-engineered wrapper around Yahoo Finance's undocumented API. Key risks: breaking changes without notice, silent throttling, unpredictable None/NaN fields. The version is pinned at `0.2.59` to avoid breakage.
+**Alpaca** (primary — requires free brokerage account at alpaca.markets):
+- Current price → `StockLatestTradeRequest` in `Assets.get_info()` / `get_info_etf()`
+- 90-day historical bars → `StockBarsRequest` in `Assets.get_price_stats()`
+- Options chain (bid/ask/IV per expiry) → `OptionChainRequest` in `functions.get_alpaca_option_chain()`
+- Production limit: **120 requests/minute**
 
-**Tradier brokerage API** is the planned replacement:
-- Requires a free Tradier brokerage account (no minimum balance)
-- Production tier: **120 requests/minute** (vs ~60 unofficial limit with yfinance)
-- Real-time bid/ask, options chains, open interest from an actual broker feed
-- Stable documented JSON schema — eliminates the None/NaN field surprises
-- Python: use the `tradier` client library or plain `requests`
-- Docs: developer.tradier.com
+**yfinance** (retained for stable/non-real-time data only):
+- Options expiry date list → `yf.Ticker(symbol).options` in `Assets.get_info()` / `get_info_etf()`
+- Sector, industry, beta → `yf.Ticker(symbol).info` in `Assets.Equity.get_info()` (equities only)
+- FTSE100/DJI index change → `functions.get_index_change_last5d()` (display-only)
+- VIX → `functions.get_vix()` (display-only)
 
-**Scope of migration when ready:**
-- `Assets.py` — replace `get_info()`, `get_info_etf()` with Tradier quotes endpoint
-- `Assets.py` — replace `get_price_stats()` with Tradier historical data endpoint
-- `covered_calls.py`, `put_options.py` — replace `stock.option_chain(date).calls/puts` with Tradier options chain endpoint
-- `functions.py` — `get_index_change_last5d()` and `get_vix()` may stay on yfinance (index data) or switch to a free alternative
-- `main.py` — minimal changes; consumes dicts from the above methods
+yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 
 ## config.py — what to change per run
 

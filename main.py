@@ -95,7 +95,6 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if not ticker_data:
                 continue
 
-            stock = ticker_data["stock"]
             price = float(ticker_data["price"])
             options = ticker_data["options"]
             sector = functions.normalize_nullable_fields(ticker_data["sector"])
@@ -132,7 +131,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                 # search for long calls deep ITM: only useful for spreads
                 has_long_itm_options = False
                 if option_no == 2:
-                    has_long_itm_options = spread_options.scan_long_cov_calls(options, stock, price)
+                    has_long_itm_options = spread_options.scan_long_cov_calls(options, t, price)
 
                 for d in options:
                     if d not in target_dates:
@@ -146,7 +145,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 stock_exchange,
                                 d,
                                 min_bid_price,
-                                stock,
+                                t,
                                 price,
                                 lowest_price,
                                 highest_price,
@@ -176,7 +175,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 stock_exchange,
                                 d,
                                 min_bid_price,
-                                stock,
+                                t,
                                 price,
                                 lowest_price,
                                 highest_price,
@@ -206,7 +205,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 stock_exchange,
                                 d,
                                 min_bid_price,
-                                stock,
+                                t,
                                 price,
                                 lowest_price,
                                 highest_price,
@@ -244,7 +243,6 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if not ticker_data:
                 continue
 
-            stock = ticker_data["stock"]
             price = float(ticker_data["price"])
             options = ticker_data["options"]
 
@@ -285,7 +283,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 stock_exchange,
                                 d,
                                 min_bid_price,
-                                stock,
+                                t,
                                 price,
                                 lowest_price,
                                 highest_price,
@@ -312,7 +310,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 stock_exchange,
                                 d,
                                 min_bid_price,
-                                stock,
+                                t,
                                 price,
                                 lowest_price,
                                 highest_price,
@@ -339,7 +337,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 stock_exchange,
                                 d,
                                 min_bid_price,
-                                stock,
+                                t,
                                 price,
                                 lowest_price,
                                 highest_price,
