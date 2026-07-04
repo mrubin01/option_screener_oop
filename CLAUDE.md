@@ -68,15 +68,32 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 JSON files are written to `~/options-saas/shared/data/` with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
 
-## Rollback point
+## Rollback points
 
-Tag **`pre-alpaca-migration`** (commit `6335d9c`) marks the last stable state before the Alpaca migration. To roll back:
+Tag **`pre-alpaca-migration`** (commit `6335d9c`) marks the last stable state before the Alpaca migration.
+
+Tag **`pre-threading-refactor`** (commit `ae7560f`) marks the last stable state before the threading + rate-limiter refactor.
+
+To roll back to either tag:
 
 ```bash
 git checkout main
-git reset --hard pre-alpaca-migration
+git reset --hard <tag-name>
 git push --force origin main   # only if broken changes were already pushed
 ```
+
+## Threading and rate limiting
+
+The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in parallel (I/O-bound workload — threads, not processes).
+
+**Rate limiter** — `alpaca_client.py` exposes a module-level `_RateLimiter` (token bucket, 180 calls/min — conservative buffer under Alpaca's 200/min ceiling) and three thin wrapper functions that every Alpaca call goes through:
+- `alpaca_client.get_latest_trades(req)` — used by `Assets.get_info()` / `get_info_etf()`
+- `alpaca_client.get_stock_bars(req)` — used by `Assets.get_price_stats()`
+- `alpaca_client.get_option_chain(req)` — used by `functions.get_alpaca_option_chain()`
+
+**Parallelism** — `main.py` extracts per-ticker logic into `_process_equity_ticker()` and `_process_etf_ticker()`, then maps them over `ticker_list` with `ThreadPoolExecutor(max_workers=8)`. The rate limiter is the throughput ceiling; adding more workers beyond ~8 yields no benefit.
+
+**Prints** — per-ticker status prints (`Scanning stock…`, `Match!`) were removed; only the header (index/VIX) and footer (contract count, execution time) remain.
 
 ## Data sources
 

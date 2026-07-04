@@ -190,7 +190,7 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
             expiration_date=expiry_date,
             type=ct,
         )
-        chain = alpaca_client.option_client.get_option_chain(req)
+        chain = alpaca_client.get_option_chain(req)
     except Exception:
         return pd.DataFrame()
 
