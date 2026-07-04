@@ -1,7 +1,10 @@
 import yfinance as yf
+import pandas as pd
 import functions
 import alpaca_client
-from alpaca.data.requests import StockLatestTradeRequest
+from alpaca.data.requests import StockLatestTradeRequest, StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
+from datetime import datetime, timedelta
 
 
 class Asset(object):
@@ -36,23 +39,21 @@ class Asset(object):
 
     def get_price_stats(self) -> dict:
         try:
-            data = yf.download(self._symbol, period="3mo", group_by="column", progress=False)
+            req = StockBarsRequest(
+                symbol_or_symbols=self._symbol,
+                timeframe=TimeFrame.Day,
+                start=datetime.now() - timedelta(days=90),
+            )
+            bars = alpaca_client.stock_client.get_stock_bars(req)
 
-            if data is None or data.empty:
+            if self._symbol not in bars.data or not bars.data[self._symbol]:
                 return {}
 
-            if "Close" not in data:
-                return {}
-
-            close_prices = data["Close"]
-
-            if hasattr(close_prices, "columns"):
-                if self._symbol not in close_prices.columns:
-                    return {}
-                close_prices = close_prices[self._symbol]
-
-            if close_prices is None or close_prices.empty:
-                return {}
+            close_prices = pd.Series(
+                [b.close for b in bars.data[self._symbol]],
+                index=[b.timestamp.date() for b in bars.data[self._symbol]],
+                dtype=float,
+            )
 
             close_prices = close_prices.dropna()
             if close_prices.empty:
