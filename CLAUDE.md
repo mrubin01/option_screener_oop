@@ -38,8 +38,14 @@ Keys are loaded at import time by `alpaca_client.py` via `python-dotenv`. The sc
 
 The screener iterates over a ticker list, fetches market data via Alpaca (price, historical bars, options chain) and yfinance (expiry dates list, sector/industry/beta), applies filters, and writes matching option contracts to JSON files consumed by a separate `options-saas` frontend.
 
+**Ticker files** live in `tickers/` (gitignored — runtime data, updated each full scan):
+- `nyse_options.txt`, `nasdaq_options.txt`, `arca_options.txt` — filtered lists (tickers with options, `SCOPE=0`)
+- `nyse_full.txt`, `nasdaq_full.txt`, `arca_full.txt` — full exchange lists (`SCOPE=1`)
+
+`main.py` resolves paths via `TICKERS_DIR = Path(__file__).parent / "tickers"`.
+
 **Data flow:**
-1. `main.py` reads a ticker list from a hardcoded `.txt` file (path depends on `STOCK_EXCHANGE` and `SCOPE` in `config.py`)
+1. `main.py` reads a ticker list from `tickers/` (file chosen by `STOCK_EXCHANGE` and `SCOPE` in `config.py`)
 2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
 3. It calls `.get_info()` / `.get_info_etf()` and `.get_price_stats()` — both return dicts or `{}` on failure
 4. Pre-filters: price > `MAX_STOCK_PRICE` and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker

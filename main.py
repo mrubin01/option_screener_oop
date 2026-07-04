@@ -3,12 +3,16 @@ import time
 import functions
 import warnings
 import pandas as pd
+from pathlib import Path
 import Assets
 import config
 import spread_options
 import covered_calls as cov_calls
 import put_options as put_options
 from concurrent.futures import ThreadPoolExecutor
+
+BASE_DIR = Path(__file__).parent
+TICKERS_DIR = BASE_DIR / "tickers"
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -57,17 +61,17 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
     match (stock_exchange, scope):
         case (0, 0):
-            ticker_file = "/Users/madararubino/stocks_with_options_nyse.txt"
+            ticker_file = TICKERS_DIR / "nyse_options.txt"
         case (1, 0):
-            ticker_file = "/Users/madararubino/stocks_with_options_nasdaq.txt"
+            ticker_file = TICKERS_DIR / "nasdaq_options.txt"
         case (2, 0):
-            ticker_file = "/Users/madararubino/stocks_with_options_arca.txt"
+            ticker_file = TICKERS_DIR / "arca_options.txt"
         case (0, 1):
-            ticker_file = "/Users/madararubino/shared_data/nyse_tickers_last.txt"
+            ticker_file = TICKERS_DIR / "nyse_full.txt"
         case (1, 1):
-            ticker_file = "/Users/madararubino/shared_data/nasdaq_tickers_last.txt"
+            ticker_file = TICKERS_DIR / "nasdaq_full.txt"
         case (2, 1):
-            ticker_file = "/Users/madararubino/shared_data/nyse_arca_tickers_last.txt"
+            ticker_file = TICKERS_DIR / "arca_full.txt"
         case _:
             print("Wrong values!")
             sys.exit()
@@ -237,48 +241,48 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
     # write list of tickers with options
     if stock_exchange == 0 and scope == 1:
-        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nyse.txt")
+        functions.write_tickers_to_file(tickers_with_options, str(TICKERS_DIR / "nyse_options.txt"))
     elif stock_exchange == 1 and scope == 1:
-        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_nasdaq.txt")
+        functions.write_tickers_to_file(tickers_with_options, str(TICKERS_DIR / "nasdaq_options.txt"))
     elif stock_exchange == 2 and scope == 1:
-        functions.write_tickers_to_file(tickers_with_options, "/Users/madararubino/stocks_with_options_arca.txt")
+        functions.write_tickers_to_file(tickers_with_options, str(TICKERS_DIR / "arca_options.txt"))
 
     # write NYSE covered calls
     if stock_exchange == 0 and option_no == 0:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_cov_calls_nyse.json", 0, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_cov_calls_nyse.json", 0, all_best_contracts_sorted)
     # write NYSE put options
     if stock_exchange == 0 and option_no == 1:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_put_options_nyse.json", 0, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_put_options_nyse.json", 0, all_best_contracts_sorted)
     # write NYSE spread options
     if stock_exchange == 0 and option_no == 2:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_spreads_nyse.json", 0, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_spreads_nyse.json", 0, all_best_contracts_sorted)
     # write NASDAQ covered calls
     elif stock_exchange == 1 and option_no == 0:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_cov_calls_nasdaq.json", 1, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_cov_calls_nasdaq.json", 1, all_best_contracts_sorted)
     # write NASDAQ put options
     elif stock_exchange == 1 and option_no == 1:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_put_options_nasdaq.json", 1, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_put_options_nasdaq.json", 1, all_best_contracts_sorted)
     # write NASDAQ spread options
     elif stock_exchange == 1 and option_no == 2:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_spreads_nasdaq.json", 1, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_spreads_nasdaq.json", 1, all_best_contracts_sorted)
     # write ARCA covered calls
     elif stock_exchange == 2 and option_no == 0:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_cov_calls_arca.json", 2, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_cov_calls_arca.json", 2, all_best_contracts_sorted)
     # write ARCA put options
     elif stock_exchange == 2 and option_no == 1:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_put_options_arca.json", 2, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_put_options_arca.json", 2, all_best_contracts_sorted)
     # write ARCA spread options
     elif stock_exchange == 2 and option_no == 2:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas/shared/data/best_spreads_arca.json", 2, all_best_contracts_sorted)
+            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_spreads_arca.json", 2, all_best_contracts_sorted)
 
     end_time = time.time()
     execution_time = end_time - start_time
