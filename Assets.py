@@ -1,5 +1,7 @@
 import yfinance as yf
 import functions
+import alpaca_client
+from alpaca.data.requests import StockLatestTradeRequest
 
 
 class Asset(object):
@@ -92,34 +94,32 @@ class Equity(Asset):
         return f"{self.symbol} is an equity, its exchange is {self.exchange}"
 
     def get_info(self) -> dict:
-        """ Call yfinance and store data into a dict """
         try:
+            req = StockLatestTradeRequest(symbol_or_symbols=self._symbol)
+            trade = alpaca_client.stock_client.get_stock_latest_trade(req)
+            if self._symbol not in trade:
+                return {}
+            price = float(trade[self._symbol].price)
+
+            # yfinance retained for options list and fundamentals only
             stock = yf.Ticker(self._symbol)
-            if not stock:
+            options = stock.options
+            if not options:
                 return {}
 
             info = stock.info
             if not info or not isinstance(info, dict):
                 return {}
 
-            price = info.get("currentPrice")
-            if price is None:
-                return {}
-            price = float(price)
-
-            options = stock.options
-            if options is None or len(options) == 0:
-                return {}
-
             return {
                 "stock": stock,
                 "price": price,
                 "options": options,
-                "sector": info["sector"],
-                "industry": info["industry"],
-                "beta": info["beta"],
-                "vol_aver_10days": info["averageDailyVolume10Day"],
-                "vol_aver_3months": info["averageDailyVolume3Month"],
+                "sector": info.get("sector"),
+                "industry": info.get("industry"),
+                "beta": info.get("beta"),
+                "vol_aver_10days": info.get("averageDailyVolume10Day"),
+                "vol_aver_3months": info.get("averageDailyVolume3Month"),
             }
 
         except Exception:
@@ -134,38 +134,26 @@ class ETF(Asset):
         return f"{self.symbol} is an ETF, its exchange is {self.exchange}"
 
     def get_info_etf(self):
-        """ Call Yahoo Finance API and store data into a dict """
-
         try:
+            req = StockLatestTradeRequest(symbol_or_symbols=self._symbol)
+            trade = alpaca_client.stock_client.get_stock_latest_trade(req)
+            if self._symbol not in trade:
+                return {}
+            price = float(trade[self._symbol].price)
+
+            # yfinance retained for options list only; no .info call needed for ETFs
             stock = yf.Ticker(self._symbol)
-            if not stock:
-                return {}
-
-            info = stock.info
-            if not info or not isinstance(info, dict):
-                return {}
-
-            price = info.get("regularMarketPrice")
-            if price is None:
-                return {}
-            price = float(price)
-
             options = stock.options
-            if options is None or len(options) == 0:
+            if not options:
                 return {}
-
-            vol_aver_10days = info["averageDailyVolume10Day"]
-            vol_aver_3months = info["averageDailyVolume3Month"]
 
             return {
                 "stock": stock,
                 "price": price,
                 "options": options,
-                "vol_aver_10days": vol_aver_10days,
-                "vol_aver_3months": vol_aver_3months,
             }
 
-        except Exception as e:
+        except Exception:
             return {}
 
 
