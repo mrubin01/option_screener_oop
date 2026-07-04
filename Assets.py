@@ -113,7 +113,6 @@ class Equity(Asset):
                 return {}
 
             return {
-                "stock": stock,
                 "price": price,
                 "options": options,
                 "sector": info.get("sector"),
@@ -149,7 +148,6 @@ class ETF(Asset):
                 return {}
 
             return {
-                "stock": stock,
                 "price": price,
                 "options": options,
             }

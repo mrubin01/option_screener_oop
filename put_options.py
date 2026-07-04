@@ -1,4 +1,3 @@
-import yfinance
 import Assets
 from typing import Any
 import config
@@ -11,7 +10,7 @@ def scan_put_options(
     exchange: int,
     option_date: str,
     threshold_bid: float,
-    stock: yfinance.Ticker,
+    symbol: str,
     current_price: float,
     lowest_price: float,
     highest_price: float,
@@ -30,11 +29,7 @@ def scan_put_options(
     if threshold_bid < 0:
         raise ValueError("threshold_bid must be non-negative")
 
-    try:
-        puts = stock.option_chain(option_date).puts
-    except Exception:
-        return []
-
+    puts = functions.get_alpaca_option_chain(symbol, option_date, "put")
     if puts is None or puts.empty:
         return []
 

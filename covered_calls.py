@@ -1,4 +1,3 @@
-import yfinance
 import Assets
 from typing import Any
 import config
@@ -11,7 +10,7 @@ def scan_covered_calls(
     exchange: int,
     option_date: str,
     threshold_bid: float,
-    stock: yfinance.Ticker,
+    symbol: str,
     current_price: float,
     lowest_price: float,
     highest_price: float,
@@ -30,11 +29,7 @@ def scan_covered_calls(
     if threshold_bid < 0:
         raise ValueError("threshold_bid must be non-negative")
 
-    try:
-        cc = stock.option_chain(option_date).calls
-    except Exception:
-        return []
-
+    cc = functions.get_alpaca_option_chain(symbol, option_date, "call")
     if cc is None or cc.empty:
         return []
 

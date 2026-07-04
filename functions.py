@@ -9,6 +9,9 @@ import math
 from py_vollib.black_scholes.greeks.analytical import delta
 from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
+import alpaca_client
+from alpaca.data.requests import OptionChainRequest
+from alpaca.trading.enums import ContractType
 
 
 def sigma_distance_to_strike(
@@ -177,6 +180,37 @@ def normalize_nullable_float(value) -> float | None:
         return float(value)
     except (ValueError, TypeError):
         return None
+
+
+def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> pd.DataFrame:
+    ct = ContractType.CALL if option_type.lower() in ("call", "calls", "c") else ContractType.PUT
+    try:
+        req = OptionChainRequest(
+            underlying_symbol=symbol,
+            expiration_date=expiry_date,
+            type=ct,
+        )
+        chain = alpaca_client.option_client.get_option_chain(req)
+    except Exception:
+        return pd.DataFrame()
+
+    if not chain:
+        return pd.DataFrame()
+
+    rows = []
+    for contract_sym, snap in chain.items():
+        if snap.latest_quote is None:
+            continue
+        rows.append({
+            "contractSymbol": contract_sym,
+            "bid": snap.latest_quote.bid_price or 0.0,
+            "ask": snap.latest_quote.ask_price or 0.0,
+            "strike": int(contract_sym[-8:]) / 1000,
+            "impliedVolatility": snap.implied_volatility or 0.0,
+            "openInterest": 0,
+        })
+
+    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
 def get_std_dev(ticker: str, price_list: pd.DataFrame | pd.Series) -> list[float]:
