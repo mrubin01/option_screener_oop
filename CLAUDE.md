@@ -25,14 +25,15 @@ pip install py_vollib python-dateutil
 
 Key pinned versions: `yfinance==0.2.59`, `curl-cffi==0.10.0`, Python 3.10.
 
-**Alpaca API keys** — create a `.env` file in the project root (never committed):
+**`.env` file** — create in the project root (never committed):
 
 ```
 ALPACA_API_KEY=your_api_key_here
 ALPACA_SECRET_KEY=your_secret_key_here
+OUTPUT_DIR=/path/to/options-saas-refactored-phase1/shared/data
 ```
 
-Keys are loaded at import time by `alpaca_client.py` via `python-dotenv`. The screener will raise `RuntimeError` on startup if either key is missing.
+`ALPACA_API_KEY` and `ALPACA_SECRET_KEY` are loaded at import time by `alpaca_client.py` via `python-dotenv`. `OUTPUT_DIR` is read by `main.py` at startup. The screener will raise `RuntimeError` on startup if any of the three are missing.
 
 ## Architecture
 

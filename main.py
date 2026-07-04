@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import functions
@@ -13,6 +14,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 BASE_DIR = Path(__file__).parent
 TICKERS_DIR = BASE_DIR / "tickers"
+
+_output_dir = os.getenv("OUTPUT_DIR")
+if not _output_dir:
+    raise RuntimeError("OUTPUT_DIR must be set in .env")
+OUTPUT_DIR = Path(_output_dir)
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -250,39 +256,39 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     # write NYSE covered calls
     if stock_exchange == 0 and option_no == 0:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_cov_calls_nyse.json", 0, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_cov_calls_nyse.json", 0, all_best_contracts_sorted)
     # write NYSE put options
     if stock_exchange == 0 and option_no == 1:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_put_options_nyse.json", 0, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_put_options_nyse.json", 0, all_best_contracts_sorted)
     # write NYSE spread options
     if stock_exchange == 0 and option_no == 2:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_spreads_nyse.json", 0, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_spreads_nyse.json", 0, all_best_contracts_sorted)
     # write NASDAQ covered calls
     elif stock_exchange == 1 and option_no == 0:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_cov_calls_nasdaq.json", 1, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_cov_calls_nasdaq.json", 1, all_best_contracts_sorted)
     # write NASDAQ put options
     elif stock_exchange == 1 and option_no == 1:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_put_options_nasdaq.json", 1, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_put_options_nasdaq.json", 1, all_best_contracts_sorted)
     # write NASDAQ spread options
     elif stock_exchange == 1 and option_no == 2:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_spreads_nasdaq.json", 1, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_spreads_nasdaq.json", 1, all_best_contracts_sorted)
     # write ARCA covered calls
     elif stock_exchange == 2 and option_no == 0:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_cov_calls_arca.json", 2, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_cov_calls_arca.json", 2, all_best_contracts_sorted)
     # write ARCA put options
     elif stock_exchange == 2 and option_no == 1:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_put_options_arca.json", 2, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_put_options_arca.json", 2, all_best_contracts_sorted)
     # write ARCA spread options
     elif stock_exchange == 2 and option_no == 2:
         functions.write_best_options_to_json(
-            "/Users/madararubino/options-saas-refactored-phase1/shared/data/best_spreads_arca.json", 2, all_best_contracts_sorted)
+            OUTPUT_DIR / "best_spreads_arca.json", 2, all_best_contracts_sorted)
 
     end_time = time.time()
     execution_time = end_time - start_time
