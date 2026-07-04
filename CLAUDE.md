@@ -48,7 +48,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 **Module responsibilities:**
 - `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `TARGET_DATES`, thresholds). Only `TYPE` and `STOCK_EXCHANGE` need editing before each run; `TARGET_DATES` is auto-computed.
-- `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; imported by `Assets.py` and `functions.py`
+- `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and three rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame), `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`; `get_index_change_last5d` and `get_vix` still use yfinance (display-only)
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`
@@ -101,7 +101,7 @@ The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in 
 - Current price → `StockLatestTradeRequest` in `Assets.get_info()` / `get_info_etf()`
 - 90-day historical bars → `StockBarsRequest` in `Assets.get_price_stats()`
 - Options chain (bid/ask/IV per expiry) → `OptionChainRequest` in `functions.get_alpaca_option_chain()`
-- Production limit: **120 requests/minute**
+- Production limit: **200 requests/minute** (rate limiter set to 180 as a safety buffer)
 
 **yfinance** (retained for stable/non-real-time data only):
 - Options expiry date list → `yf.Ticker(symbol).options` in `Assets.get_info()` / `get_info_etf()`
