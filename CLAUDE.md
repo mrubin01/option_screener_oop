@@ -17,13 +17,21 @@ There are no tests or a lint step in this project.
 
 ## Environment setup
 
+**conda (local development):**
 ```bash
 conda env create -f environment.yml
 conda activate option_screener_oop
 pip install py_vollib python-dateutil
 ```
 
-Key pinned versions: `yfinance==0.2.59`, `curl-cffi==0.10.0`, Python 3.10.
+**pip/venv (production server, CI):**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Pinned packages: `alpaca-py==0.43.5`, `yfinance==0.2.59`, `curl-cffi==0.10.0`, `py_vollib==1.0.1`. Python 3.10 required.
 
 **`.env` file** — create in the project root (never committed):
 
