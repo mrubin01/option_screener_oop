@@ -81,7 +81,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 ## Output
 
-JSON files are written to `~/options-saas/shared/data/` with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
+JSON files are written to the path set by `OUTPUT_DIR` in `.env` (e.g. `shared/data/` in the main repo), with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
 
 ## Rollback points
 
@@ -89,7 +89,9 @@ Tag **`pre-alpaca-migration`** (commit `6335d9c`) marks the last stable state be
 
 Tag **`pre-threading-refactor`** (commit `ae7560f`) marks the last stable state before the threading + rate-limiter refactor.
 
-To roll back to either tag:
+Tag **`pre-merge-cleanup`** (commit `2aa7941`) marks the last stable state before merging into `options-saas-refactored-phase1` as the `scanner/` module. Ticker files live in `tickers/`, output path is driven by `OUTPUT_DIR` env var, `requirements.txt` is present.
+
+To roll back to any tag:
 
 ```bash
 git checkout main
