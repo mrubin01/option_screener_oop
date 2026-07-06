@@ -1,4 +1,3 @@
-import sys
 import json
 import yfinance as yf
 import numpy as np
@@ -278,43 +277,6 @@ def create_user_agent():
     session.headers['User-Agent'] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:132.0) Gecko/20100101 Firefox/132.0"
 
     return session
-
-
-def get_index_change_last5d(index_ticker: str, period: str = "5d"):
-    data = yf.download(index_ticker, period=period, group_by='column')
-    close_prices = data['Close']
-    first_price = round(close_prices.iloc[0][index_ticker], 2)
-    last_price = round(close_prices.iloc[-1][index_ticker], 2)
-
-    if index_ticker == "^FTSE" or index_ticker == "^DJI":
-        change = round(((last_price - first_price) / first_price) * 100, 2)
-        return change
-    else:
-        print("Wrong Index ticker!")
-        sys.exit()
-
-
-
-def get_vix():
-    """"
-    It checks for the current volatility index VIX
-    :param none
-    :return: none
-    """
-    data = yf.Ticker("^VIX")
-    info = data.info
-    current_vix = info["regularMarketPrice"]
-
-    if current_vix < 15:
-        print(f"|-- Volatility index VIX is {current_vix} --> LOW --|")
-    elif 15 <= current_vix < 20:
-        print(f"|-- Volatility index VIX is {current_vix} --> MODERATE --|")
-    elif 20 <= current_vix < 30:
-        print(f"|-- WARNING: Volatility index VIX is {current_vix} --> HIGH --|")
-    elif 30 <= current_vix < 80:
-        print(f"|-- WARNING: Volatility index VIX is {current_vix} --> VERY HIGH --|")
-    elif current_vix >= 80:
-        print(f"|-- WARNING: Volatility index VIX is {current_vix} --> EXTREMELY HIGH --|")
 
 
 def compute_main_trend(

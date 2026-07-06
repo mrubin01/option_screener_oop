@@ -11,12 +11,8 @@ def _next_n_fridays(n: int) -> list[date]:
 TARGET_DATES = [d.strftime("%Y-%m-%d") for d in _next_n_fridays(3)]
 
 # global variables
-TYPE = 2  # 0 call, 1 put, 2 spread
+TYPE = 0  # 0 call, 1 put, 2 spread
 STOCK_EXCHANGE = 0  # nyse, nasdaq, arca
-if STOCK_EXCHANGE in [0, 1]:
-    MAX_STOCK_PRICE = 50
-else:
-    MAX_STOCK_PRICE = 200
 STD_DEV_THRESHOLD = 15
 if STOCK_EXCHANGE in [0, 1]:
     STRIKE_PRICE_THRESHOLD = 1.5
@@ -27,10 +23,6 @@ WRITE_TICKERS_TO_FILE = 1
 
 OPTION_TYPE = ["Call", "Put", "Spread"]
 EXCHANGES = ["NYSE", "NASDAQ", "ARCA"]
-if STOCK_EXCHANGE in [0, 1]:
-    MIN_BID_PRICE = 0.2
-else:
-    MIN_BID_PRICE = 0.5
 TREND_DOWN = -1
 TREND_SIDEWAYS = 0
 TREND_UP = 1

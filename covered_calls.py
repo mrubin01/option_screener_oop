@@ -35,6 +35,8 @@ def scan_covered_calls(
 
     main_trend = functions.compute_main_trend(current_price, avg_price, avg_price_7d, avg_price_30d, trend)
     dte = functions.days_to_expiration(option_date)
+    if dte <= 0:
+        return []
 
     for row in cc.itertuples(index=False):
         if isinstance(row.bid, float) and math.isnan(row.bid):
