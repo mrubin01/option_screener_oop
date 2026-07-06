@@ -24,7 +24,6 @@ warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", None)
 
-max_stock_price = config.MAX_STOCK_PRICE
 target_dates = config.TARGET_DATES
 std_dev_threshold = config.STD_DEV_THRESHOLD
 scope = config.SCOPE
@@ -32,12 +31,35 @@ write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
 
 option_type = config.OPTION_TYPE
 exchanges = config.EXCHANGES
-min_bid_price = config.MIN_BID_PRICE
+
+# Ordered list of (exchange, option_type) for a full automated run
+SCANS = [
+    (0, 0),  # calls  NYSE
+    (1, 1),  # puts   NASDAQ
+    (2, 2),  # spread ARCA
+    (1, 0),  # calls  NASDAQ
+    (2, 1),  # puts   ARCA
+    (0, 2),  # spread NYSE
+    (2, 0),  # calls  ARCA
+    (0, 1),  # puts   NYSE
+    (1, 2),  # spread NASDAQ
+]
 
 
 def main(exchange_number: int = 0, option_type_input: int | None = None):
     stock_exchange = exchange_number
     option_no = option_type_input if option_type_input is not None else config.TYPE
+
+    # Exchange-specific thresholds — must be derived from the actual exchange
+    # passed at call time, not from config.STOCK_EXCHANGE set at load time.
+    if stock_exchange in [0, 1]:
+        max_stock_price = 50
+        min_bid_price = 0.2
+        config.STRIKE_PRICE_THRESHOLD = 1.5
+    else:
+        max_stock_price = 200
+        min_bid_price = 0.5
+        config.STRIKE_PRICE_THRESHOLD = 3
 
     print("|--------------------------------------------------------------------------|")
 
@@ -274,19 +296,13 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
 
 if __name__ == "__main__":
-    def _ask(prompt: str, valid: tuple) -> int:
-        while True:
-            try:
-                val = int(input(prompt))
-                if val in valid:
-                    return val
-            except ValueError:
-                pass
-            print(f"Invalid input. Enter one of: {valid}")
-
-    if len(sys.argv) > 1:
-        main(int(sys.argv[1]))
-    else:
-        _opt = _ask("Option type  0=calls  1=puts  2=spreads\n>> ", (0, 1, 2))
-        _exch = _ask("Exchange     0=NYSE   1=NASDAQ  2=ARCA\n>> ", (0, 1, 2))
-        main(_exch, _opt)
+    total_start = time.time()
+    for i, (exch, opt) in enumerate(SCANS, 1):
+        print(f"\n{'='*74}")
+        print(f"  Scan {i}/{len(SCANS)}: {option_type[opt]} — {exchanges[exch]}")
+        print(f"{'='*74}")
+        main(exch, opt)
+    total_elapsed = time.time() - total_start
+    print(f"\n{'='*74}")
+    print(f"  All {len(SCANS)} scans complete — {total_elapsed/60:.1f} min total")
+    print(f"{'='*74}")
