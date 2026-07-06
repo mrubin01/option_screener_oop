@@ -201,13 +201,15 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
     for contract_sym, snap in chain.items():
         if snap.latest_quote is None:
             continue
+        if not snap.implied_volatility:
+            continue
         rows.append({
             "contractSymbol": contract_sym,
             "bid": snap.latest_quote.bid_price or 0.0,
             "ask": snap.latest_quote.ask_price or 0.0,
             "strike": int(contract_sym[-8:]) / 1000,
-            "impliedVolatility": snap.implied_volatility or 0.0,
-            "openInterest": 0,
+            "impliedVolatility": snap.implied_volatility,
+            "openInterest": snap.open_interest or 0,
         })
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()
