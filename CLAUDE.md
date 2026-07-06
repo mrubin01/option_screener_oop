@@ -5,13 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the screener
 
 ```bash
-# Run with default exchange (ARCA, exchange=2)
+# Run all 9 scans unattended (calls/puts/spreads × NYSE/NASDAQ/ARCA)
 python main.py
-
-# Run with a specific exchange (0=NYSE, 1=NASDAQ, 2=ARCA)
-python main.py 0
-python main.py 1
 ```
+
+The scan order is defined by `SCANS` in `main.py`:
+calls NYSE → puts NASDAQ → spreads ARCA → calls NASDAQ → puts ARCA → spreads NYSE → calls ARCA → puts NYSE → spreads NASDAQ
 
 There are no tests or a lint step in this project.
 
@@ -62,7 +61,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 6. Matched contracts (dicts) are collected, sorted by `option_yield` descending, and written to JSON via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
-- `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `TARGET_DATES`, thresholds). Only `TYPE` and `STOCK_EXCHANGE` need editing before each run; `TARGET_DATES` is auto-computed.
+- `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `TARGET_DATES`, thresholds). `TARGET_DATES` is auto-computed. `TYPE` and `STOCK_EXCHANGE` are no longer edited per run — the full automated run cycles through all 9 combinations. Exchange-specific thresholds (`MAX_STOCK_PRICE`, `MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are computed inside `main()` from the actual exchange argument, not from `config.STOCK_EXCHANGE` at load time.
 - `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and three rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame), `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`; `get_index_change_last5d` and `get_vix` still use yfinance (display-only)
@@ -110,7 +109,7 @@ The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in 
 
 **Parallelism** — `main.py` extracts per-ticker logic into `_process_equity_ticker()` and `_process_etf_ticker()`, then maps them over `ticker_list` with `ThreadPoolExecutor(max_workers=8)`. The rate limiter is the throughput ceiling; adding more workers beyond ~8 yields no benefit.
 
-**Prints** — per-ticker status prints (`Scanning stock…`, `Match!`) were removed; only the header (index/VIX) and footer (contract count, execution time) remain.
+**Prints** — per-ticker status prints (`Scanning stock…`, `Match!`) and the market index/VIX header block were removed. Each scan prints a scan header (e.g. `Scan 3/9: Spread — ARCA`) and footer (contract count, execution time). The full run prints a total elapsed time at the end.
 
 ## Data sources
 
@@ -132,8 +131,8 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 
 | Variable | Values | Effect |
 |---|---|---|
-| `TYPE` | 0=call, 1=put, 2=spread | Which option module runs |
-| `STOCK_EXCHANGE` | 0=NYSE, 1=NASDAQ, 2=ARCA | Ticker list and asset class used |
+| `TYPE` | 0=call, 1=put, 2=spread | No longer edited — full run cycles all types |
+| `STOCK_EXCHANGE` | 0=NYSE, 1=NASDAQ, 2=ARCA | No longer edited — full run cycles all exchanges |
 | `TARGET_DATES` | auto-computed | Next 3 Fridays from today; no manual edit needed |
 | `SCOPE` | 0=tickers with options only, 1=full list | Input ticker file |
 
@@ -176,3 +175,7 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 | 33 | `config.py` — `TEST` and `HAVE_OPTIONS` defined but never referenced | Non-critical | Done |
 | 34 | `Assets.py` — unused imports: `datetime`, `requests_cache`, `requests`, `numpy`, `pandas` | Non-critical | Done |
 | 35 | `functions.py:7` — `import csv` unused | Non-critical | Done |
+| 36 | `alpaca_client.py` — `get_latest_stock_trades` doesn't exist; correct method is `get_stock_latest_trade` — every `get_info()` call raised `AttributeError`, silently returning `{}` and skipping all tickers | Critical | Done |
+| 37 | `functions.py` — `snap.implied_volatility or 0.0` stored IV=0 for contracts where Alpaca returns `None`; first such row passing the bid filter caused `ZeroDivisionError` in `py_vollib` (sigma=0), propagating through the scan function to `main.py`'s bare `except`, silently dropping all contracts for that date | Critical | Done |
+| 38 | `functions.py` — `snap.open_interest` doesn't exist on `OptionsSnapshot` in alpaca-py 0.43.5; `AttributeError` propagated through every option chain call | Critical | Done |
+| 39 | `main.py` — `MAX_STOCK_PRICE`, `MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD` computed at module load from `config.STOCK_EXCHANGE`; in a multi-exchange run they stayed fixed to the load-time exchange, giving ARCA scans NYSE thresholds | Bug | Done |
