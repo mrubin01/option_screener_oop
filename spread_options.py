@@ -20,7 +20,7 @@ def scan_long_cov_calls(
         spreads = functions.get_alpaca_option_chain(symbol, d, "call")
 
         if spreads is None or spreads.empty:
-            return False
+            continue
 
         for row in spreads.itertuples(index=False):
             if row.strike >= stock_price:

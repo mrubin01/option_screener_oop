@@ -1,0 +1,10 @@
+alpaca-py==0.43.5
+yfinance==0.2.59
+curl-cffi==0.10.0
+py_vollib==1.0.1
+scikit-learn
+numpy
+pandas
+requests-cache
+python-dotenv
+python-dateutil

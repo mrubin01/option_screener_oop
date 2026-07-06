@@ -44,7 +44,7 @@ class Asset(object):
                 timeframe=TimeFrame.Day,
                 start=datetime.now() - timedelta(days=90),
             )
-            bars = alpaca_client.stock_client.get_stock_bars(req)
+            bars = alpaca_client.get_stock_bars(req)
 
             if self._symbol not in bars.data or not bars.data[self._symbol]:
                 return {}
@@ -97,7 +97,7 @@ class Equity(Asset):
     def get_info(self) -> dict:
         try:
             req = StockLatestTradeRequest(symbol_or_symbols=self._symbol)
-            trade = alpaca_client.stock_client.get_stock_latest_trade(req)
+            trade = alpaca_client.get_latest_trades(req)
             if self._symbol not in trade:
                 return {}
             price = float(trade[self._symbol].price)
@@ -136,7 +136,7 @@ class ETF(Asset):
     def get_info_etf(self):
         try:
             req = StockLatestTradeRequest(symbol_or_symbols=self._symbol)
-            trade = alpaca_client.stock_client.get_stock_latest_trade(req)
+            trade = alpaca_client.get_latest_trades(req)
             if self._symbol not in trade:
                 return {}
             price = float(trade[self._symbol].price)

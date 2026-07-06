@@ -17,29 +17,44 @@ There are no tests or a lint step in this project.
 
 ## Environment setup
 
+**conda (local development):**
 ```bash
 conda env create -f environment.yml
 conda activate option_screener_oop
 pip install py_vollib python-dateutil
 ```
 
-Key pinned versions: `yfinance==0.2.59`, `curl-cffi==0.10.0`, Python 3.10.
+**pip/venv (production server, CI):**
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-**Alpaca API keys** — create a `.env` file in the project root (never committed):
+Pinned packages: `alpaca-py==0.43.5`, `yfinance==0.2.59`, `curl-cffi==0.10.0`, `py_vollib==1.0.1`. Python 3.10 required.
+
+**`.env` file** — create in the project root (never committed):
 
 ```
 ALPACA_API_KEY=your_api_key_here
 ALPACA_SECRET_KEY=your_secret_key_here
+OUTPUT_DIR=/path/to/options-saas-refactored-phase1/shared/data
 ```
 
-Keys are loaded at import time by `alpaca_client.py` via `python-dotenv`. The screener will raise `RuntimeError` on startup if either key is missing.
+`ALPACA_API_KEY` and `ALPACA_SECRET_KEY` are loaded at import time by `alpaca_client.py` via `python-dotenv`. `OUTPUT_DIR` is read by `main.py` at startup. The screener will raise `RuntimeError` on startup if any of the three are missing.
 
 ## Architecture
 
 The screener iterates over a ticker list, fetches market data via Alpaca (price, historical bars, options chain) and yfinance (expiry dates list, sector/industry/beta), applies filters, and writes matching option contracts to JSON files consumed by a separate `options-saas` frontend.
 
+**Ticker files** live in `tickers/` (gitignored — runtime data, updated each full scan):
+- `nyse_options.txt`, `nasdaq_options.txt`, `arca_options.txt` — filtered lists (tickers with options, `SCOPE=0`)
+- `nyse_full.txt`, `nasdaq_full.txt`, `arca_full.txt` — full exchange lists (`SCOPE=1`)
+
+`main.py` resolves paths via `TICKERS_DIR = Path(__file__).parent / "tickers"`.
+
 **Data flow:**
-1. `main.py` reads a ticker list from a hardcoded `.txt` file (path depends on `STOCK_EXCHANGE` and `SCOPE` in `config.py`)
+1. `main.py` reads a ticker list from `tickers/` (file chosen by `STOCK_EXCHANGE` and `SCOPE` in `config.py`)
 2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
 3. It calls `.get_info()` / `.get_info_etf()` and `.get_price_stats()` — both return dicts or `{}` on failure
 4. Pre-filters: price > `MAX_STOCK_PRICE` and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker
@@ -48,7 +63,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 **Module responsibilities:**
 - `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `TARGET_DATES`, thresholds). Only `TYPE` and `STOCK_EXCHANGE` need editing before each run; `TARGET_DATES` is auto-computed.
-- `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; imported by `Assets.py` and `functions.py`
+- `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and three rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame), `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`; `get_index_change_last5d` and `get_vix` still use yfinance (display-only)
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`
@@ -66,17 +81,36 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 ## Output
 
-JSON files are written to `~/options-saas/shared/data/` with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
+JSON files are written to the path set by `OUTPUT_DIR` in `.env` (e.g. `shared/data/` in the main repo), with names like `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`. Equity contracts have 30 fields; ETF contracts have 27 (no `sector`, `industry`, `beta`).
 
-## Rollback point
+## Rollback points
 
-Tag **`pre-alpaca-migration`** (commit `6335d9c`) marks the last stable state before the Alpaca migration. To roll back:
+Tag **`pre-alpaca-migration`** (commit `6335d9c`) marks the last stable state before the Alpaca migration.
+
+Tag **`pre-threading-refactor`** (commit `ae7560f`) marks the last stable state before the threading + rate-limiter refactor.
+
+Tag **`pre-merge-cleanup`** (commit `2aa7941`) marks the last stable state before merging into `options-saas-refactored-phase1` as the `scanner/` module. Ticker files live in `tickers/`, output path is driven by `OUTPUT_DIR` env var, `requirements.txt` is present.
+
+To roll back to any tag:
 
 ```bash
 git checkout main
-git reset --hard pre-alpaca-migration
+git reset --hard <tag-name>
 git push --force origin main   # only if broken changes were already pushed
 ```
+
+## Threading and rate limiting
+
+The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in parallel (I/O-bound workload — threads, not processes).
+
+**Rate limiter** — `alpaca_client.py` exposes a module-level `_RateLimiter` (token bucket, 180 calls/min — conservative buffer under Alpaca's 200/min ceiling) and three thin wrapper functions that every Alpaca call goes through:
+- `alpaca_client.get_latest_trades(req)` — used by `Assets.get_info()` / `get_info_etf()`
+- `alpaca_client.get_stock_bars(req)` — used by `Assets.get_price_stats()`
+- `alpaca_client.get_option_chain(req)` — used by `functions.get_alpaca_option_chain()`
+
+**Parallelism** — `main.py` extracts per-ticker logic into `_process_equity_ticker()` and `_process_etf_ticker()`, then maps them over `ticker_list` with `ThreadPoolExecutor(max_workers=8)`. The rate limiter is the throughput ceiling; adding more workers beyond ~8 yields no benefit.
+
+**Prints** — per-ticker status prints (`Scanning stock…`, `Match!`) were removed; only the header (index/VIX) and footer (contract count, execution time) remain.
 
 ## Data sources
 
@@ -84,7 +118,7 @@ git push --force origin main   # only if broken changes were already pushed
 - Current price → `StockLatestTradeRequest` in `Assets.get_info()` / `get_info_etf()`
 - 90-day historical bars → `StockBarsRequest` in `Assets.get_price_stats()`
 - Options chain (bid/ask/IV per expiry) → `OptionChainRequest` in `functions.get_alpaca_option_chain()`
-- Production limit: **120 requests/minute**
+- Production limit: **200 requests/minute** (rate limiter set to 180 as a safety buffer)
 
 **yfinance** (retained for stable/non-real-time data only):
 - Options expiry date list → `yf.Ticker(symbol).options` in `Assets.get_info()` / `get_info_etf()`
