@@ -47,7 +47,7 @@ _limiter = _RateLimiter(180)
 
 def get_latest_trades(req):
     _limiter.acquire()
-    return stock_client.get_latest_stock_trades(req)
+    return stock_client.get_stock_latest_trade(req)
 
 
 def get_stock_bars(req):
