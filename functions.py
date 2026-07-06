@@ -209,7 +209,7 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
             "ask": snap.latest_quote.ask_price or 0.0,
             "strike": int(contract_sym[-8:]) / 1000,
             "impliedVolatility": snap.implied_volatility,
-            "openInterest": snap.open_interest or 0,
+            "openInterest": 0,
         })
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()
