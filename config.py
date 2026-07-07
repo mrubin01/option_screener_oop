@@ -30,5 +30,15 @@ TREND_UP = 1
 RISK_FREE_RATE = 3.86  # 1-month Treasury rate
 OPTION_YIELD_THRESHOLD = 25
 
+# Exchange-specific thresholds (computed inside main() from exchange_number)
+NYSE_NASDAQ_MAX_STOCK_PRICE = 50
+ARCA_MAX_STOCK_PRICE = 200
+NYSE_NASDAQ_MIN_BID_PRICE = 0.2
+ARCA_MIN_BID_PRICE = 0.5
+
+# Spread-specific filters
+SPREAD_MIN_EXPIRY_DATES = 10
+SPREAD_MIN_ITM_DISTANCE = 6
+
 if __name__ == "__main__":
     raise RuntimeError("This module is not meant to be run directly")

@@ -53,12 +53,12 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     # Exchange-specific thresholds — must be derived from the actual exchange
     # passed at call time, not from config.STOCK_EXCHANGE set at load time.
     if stock_exchange in [0, 1]:
-        max_stock_price = 50
-        min_bid_price = 0.2
+        max_stock_price = config.NYSE_NASDAQ_MAX_STOCK_PRICE
+        min_bid_price = config.NYSE_NASDAQ_MIN_BID_PRICE
         config.STRIKE_PRICE_THRESHOLD = 1.5
     else:
-        max_stock_price = 200
-        min_bid_price = 0.5
+        max_stock_price = config.ARCA_MAX_STOCK_PRICE
+        min_bid_price = config.ARCA_MIN_BID_PRICE
         config.STRIKE_PRICE_THRESHOLD = 3
 
     print("|--------------------------------------------------------------------------|")
@@ -149,7 +149,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             lowest_price, highest_price, avg_price, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
                             sector=sector, industry=industry, beta=beta)
-                    elif option_no == 2 and len(options) > 10 and has_long_itm_options:
+                    elif option_no == 2 and len(options) > config.SPREAD_MIN_EXPIRY_DATES and has_long_itm_options:
                         best_contracts = spread_options.scan_spread_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
@@ -218,7 +218,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation)
-                    elif option_no == 2 and len(options) > 10:
+                    elif option_no == 2 and len(options) > config.SPREAD_MIN_EXPIRY_DATES:
                         best_contracts = spread_options.scan_spread_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
