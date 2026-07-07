@@ -28,7 +28,7 @@ def scan_long_cov_calls(
 
             spread_strike_price = round(abs(row.strike - stock_price), 2)
 
-            if spread_strike_price >= 6:
+            if spread_strike_price >= config.SPREAD_MIN_ITM_DISTANCE:
                 return True
 
     return False
