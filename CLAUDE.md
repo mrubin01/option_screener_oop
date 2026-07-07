@@ -53,18 +53,18 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 `main.py` resolves paths via `TICKERS_DIR = Path(__file__).parent / "tickers"`.
 
 **Data flow:**
-1. `main.py` reads a ticker list from `tickers/` (file chosen by `STOCK_EXCHANGE` and `SCOPE` in `config.py`)
+1. `main.py` reads a ticker list from `tickers/` (file chosen by `SCOPE` in `config.py` and the exchange passed to `main()`)
 2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
 3. It calls `.get_info()` / `.get_info_etf()` and `.get_price_stats()` — both return dicts or `{}` on failure
-4. Pre-filters: price > `MAX_STOCK_PRICE` and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker
+4. Pre-filters: price > exchange threshold and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker
 5. The matching option module's `scan_*` function is called for each expiry date in `config.TARGET_DATES` (auto-computed next 3 Fridays)
 6. Matched contracts (dicts) are collected, sorted by `option_yield` descending, and written to JSON via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
-- `config.py` — all tunable globals (`TYPE`, `STOCK_EXCHANGE`, `TARGET_DATES`, thresholds). `TARGET_DATES` is auto-computed. `TYPE` and `STOCK_EXCHANGE` are no longer edited per run — the full automated run cycles through all 9 combinations. Exchange-specific thresholds (`MAX_STOCK_PRICE`, `MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are computed inside `main()` from the actual exchange argument, not from `config.STOCK_EXCHANGE` at load time.
+- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 9 combinations. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are read inside `main()` from the actual exchange argument. Spread-specific filters (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) are also defined here.
 - `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and three rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
-- `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame), `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`; `get_index_change_last5d` and `get_vix` still use yfinance (display-only)
+- `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame), `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`
 - `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern
 - `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` (alias of `scan_covered_calls` from covered_calls)
@@ -122,8 +122,6 @@ The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in 
 **yfinance** (retained for stable/non-real-time data only):
 - Options expiry date list → `yf.Ticker(symbol).options` in `Assets.get_info()` / `get_info_etf()`
 - Sector, industry, beta → `yf.Ticker(symbol).info` in `Assets.Equity.get_info()` (equities only)
-- FTSE100/DJI index change → `functions.get_index_change_last5d()` (display-only)
-- VIX → `functions.get_vix()` (display-only)
 
 yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 
@@ -132,9 +130,17 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 | Variable | Values | Effect |
 |---|---|---|
 | `TYPE` | 0=call, 1=put, 2=spread | No longer edited — full run cycles all types |
-| `STOCK_EXCHANGE` | 0=NYSE, 1=NASDAQ, 2=ARCA | No longer edited — full run cycles all exchanges |
 | `TARGET_DATES` | auto-computed | Next 3 Fridays from today; no manual edit needed |
 | `SCOPE` | 0=tickers with options only, 1=full list | Input ticker file |
+| `RISK_FREE_RATE` | float (%) | 1-month Treasury rate used for delta calculation |
+| `STD_DEV_THRESHOLD` | default 15 | Tickers with CoV above this are skipped |
+| `OPTION_YIELD_THRESHOLD` | default 25 | Contracts with yield above this are skipped (unrealistic) |
+| `NYSE_NASDAQ_MAX_STOCK_PRICE` | default 50 | Price ceiling for NYSE/NASDAQ tickers |
+| `ARCA_MAX_STOCK_PRICE` | default 200 | Price ceiling for ARCA tickers |
+| `NYSE_NASDAQ_MIN_BID_PRICE` | default 0.2 | Minimum bid for NYSE/NASDAQ contracts |
+| `ARCA_MIN_BID_PRICE` | default 0.5 | Minimum bid for ARCA contracts |
+| `SPREAD_MIN_EXPIRY_DATES` | default 10 | Min number of expiry dates a ticker must have for spread scans |
+| `SPREAD_MIN_ITM_DISTANCE` | default 6 | Min $ distance between strike and price for ITM long call in spread |
 
 ## Known issues
 
@@ -179,3 +185,7 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 | 37 | `functions.py` — `snap.implied_volatility or 0.0` stored IV=0 for contracts where Alpaca returns `None`; first such row passing the bid filter caused `ZeroDivisionError` in `py_vollib` (sigma=0), propagating through the scan function to `main.py`'s bare `except`, silently dropping all contracts for that date | Critical | Done |
 | 38 | `functions.py` — `snap.open_interest` doesn't exist on `OptionsSnapshot` in alpaca-py 0.43.5; `AttributeError` propagated through every option chain call | Critical | Done |
 | 39 | `main.py` — `MAX_STOCK_PRICE`, `MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD` computed at module load from `config.STOCK_EXCHANGE`; in a multi-exchange run they stayed fixed to the load-time exchange, giving ARCA scans NYSE thresholds | Bug | Done |
+| 40 | `covered_calls.py`, `put_options.py` — `365 / dte` raises `ZeroDivisionError` if scanner runs on exact expiry date (dte=0); `sigma_distance_to_strike` also raises `ValueError` | Bug | Done |
+| 41 | `config.py` — `STOCK_EXCHANGE`, `WRITE_TICKERS_TO_FILE`, `TREND_DOWN/SIDEWAYS/UP`, `MAX_STOCK_PRICE`, `MIN_BID_PRICE` defined but never referenced outside config | Non-critical | Done |
+| 42 | `main.py`, `spread_options.py` — filter thresholds scattered as magic numbers (`50`, `200`, `0.2`, `0.5`, `10`, `6`) instead of named constants | Non-critical | Done |
+| 43 | `functions.py` — `get_vix()` and `get_index_change_last5d()` dead code (never called); `import sys` only referenced by these two functions | Non-critical | Done |
