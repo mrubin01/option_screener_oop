@@ -27,7 +27,6 @@ pd.set_option("display.max_rows", None)
 target_dates = config.TARGET_DATES
 std_dev_threshold = config.STD_DEV_THRESHOLD
 scope = config.SCOPE
-write_tickers_to_file = config.WRITE_TICKERS_TO_FILE
 
 option_type = config.OPTION_TYPE
 exchanges = config.EXCHANGES
