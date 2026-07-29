@@ -5,11 +5,10 @@ import math
 import functions
 
 
-def scan_put_options(
+def scan_long_puts(
     ticker: Assets.Equity | Assets.ETF,
     exchange: int,
     option_date: str,
-    threshold_bid: float,
     symbol: str,
     current_price: float,
     lowest_price: float,
@@ -19,59 +18,56 @@ def scan_put_options(
     avg_price_30d: float,
     trend: int,
     rel_std_deviation: float,
+    hv: float = 0.0,
     sector: str | None = None,
     industry: str | None = None,
     beta: float | None = None,
-    hv: float = 0.0,
 ) -> list[dict[str, Any]]:
 
     matched_contracts = []
-
-    if threshold_bid < 0:
-        raise ValueError("threshold_bid must be non-negative")
 
     puts = functions.get_alpaca_option_chain(symbol, option_date, "put")
     if puts is None or puts.empty:
         return []
 
     main_trend = functions.compute_main_trend(current_price, avg_price, avg_price_7d, avg_price_30d, trend)
+    if main_trend != -1:
+        return []
+
     dte = functions.days_to_expiration(option_date)
     if dte <= 0:
         return []
 
     for row in puts.itertuples(index=False):
-        if isinstance(row.bid, float) and math.isnan(row.bid):
+        ask = row.ask if not (isinstance(row.ask, float) and math.isnan(row.ask)) else 0.0
+
+        if ask < config.LONG_MIN_ASK or ask > config.LONG_MAX_ASK:
             continue
 
-        if row.bid < threshold_bid or row.strike >= current_price:
+        if row.strike >= current_price:
+            continue
+
+        moneyness = round(((current_price - float(row.strike)) / current_price) * 100, 2)
+        if moneyness > config.LONG_MAX_MONEYNESS:
+            continue
+
+        if row.openInterest > 0 and row.openInterest < config.LONG_MIN_OPEN_INTEREST:
+            continue
+
+        iv_hv_ratio = round(row.impliedVolatility / hv, 2) if hv > 0 else None
+        if iv_hv_ratio is not None and iv_hv_ratio > config.LONG_MAX_IV_HV_RATIO:
             continue
 
         spread_bid_ask = round(row.ask - row.bid, 2)
         spread_strike_price = round(abs(row.strike - current_price), 2)
-        delta_price_premium = row.bid
-        break_even = round(row.strike - row.bid, 2)
-
-        if isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask):
-            continue
-
-        if (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                spread_strike_price <= config.STRIKE_PRICE_THRESHOLD:
-            continue
-
-        if isinstance(delta_price_premium, float) and math.isnan(delta_price_premium):
-            continue
+        break_even = round(float(row.strike) - ask, 2)
+        max_profit_per_share = round(float(row.strike) - ask, 2)
 
         est_delta = functions.estimate_delta("put", current_price, row.strike, dte, config.RISK_FREE_RATE, row.impliedVolatility)
 
-        option_yield = round((row.bid / row.strike) * 100, 2)
-        if option_yield >= config.OPTION_YIELD_THRESHOLD:
-            continue
-
-        iv_hv_ratio = round(row.impliedVolatility / hv, 2) if hv > 0 else None
-
+        option_yield = round((ask / float(row.strike)) * 100, 2)
         annualized_option_yield = round(option_yield * (365 / dte), 2)
-        tot_return = round((row.bid / current_price) * 100, 2)
-        moneyness = round(((current_price - float(row.strike)) / current_price) * 100, 2)
+        tot_return = round(((float(row.strike) - ask) / current_price) * 100, 2)
         sigma_distance = functions.sigma_distance_to_strike(
             current_price, float(row.strike), float(row.impliedVolatility), dte
         )
@@ -84,14 +80,14 @@ def scan_put_options(
             "days_to_expiration": dte,
             "current_price": round(current_price, 2),
             "coeff_variation": rel_std_deviation,
-            "max_profit": round(float(delta_price_premium), 2),
-            "max_profit_per_contract": round(float(delta_price_premium * 100), 2),
+            "max_profit": max_profit_per_share,
+            "max_profit_per_contract": round(max_profit_per_share * 100, 2),
             "otm": round(float(spread_strike_price), 2),
             "strike_price": round(float(row.strike), 2),
-            "moneyness": round(moneyness, 2),
+            "moneyness": moneyness,
             "sigma_distance": round(sigma_distance, 2),
-            "bid_per_share": round(float(row.bid), 2),
-            "premium_per_contract": round(float(row.bid * 100), 2),
+            "bid_per_share": round(float(ask), 2),
+            "premium_per_contract": round(float(ask * 100), 2),
             "spread_bid_ask": round(float(spread_bid_ask), 2),
             "break_even": break_even,
             "open_interest": int(row.openInterest) if row.openInterest is not None and not (isinstance(row.openInterest, float) and math.isnan(row.openInterest)) else 0,

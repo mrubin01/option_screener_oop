@@ -68,6 +68,7 @@ class Asset(object):
             first_price = round(float(close_prices.iloc[0]), 2)
             price_trend = functions.get_price_trend(close_prices)
             abs_sd, rel_sd = functions.get_std_dev(self._symbol, close_prices)
+            hv = functions.compute_hv(close_prices)
 
             return {
                 "low": low,
@@ -80,6 +81,7 @@ class Asset(object):
                 "price_trend": price_trend,
                 "abs_sd": abs_sd,
                 "rel_sd": rel_sd,
+                "hv": hv,
             }
 
         except Exception as e:

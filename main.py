@@ -10,6 +10,8 @@ import config
 import spread_options
 import covered_calls as cov_calls
 import put_options as put_options
+import long_calls
+import long_puts
 from concurrent.futures import ThreadPoolExecutor
 
 BASE_DIR = Path(__file__).parent
@@ -19,6 +21,12 @@ _output_dir = os.getenv("OUTPUT_DIR")
 if not _output_dir:
     raise RuntimeError("OUTPUT_DIR must be set in .env")
 OUTPUT_DIR = Path(_output_dir)
+
+_buying_output_dir = os.getenv("BUYING_OUTPUT_DIR")
+if not _buying_output_dir:
+    raise RuntimeError("BUYING_OUTPUT_DIR must be set in .env")
+BUYING_OUTPUT_DIR = Path(_buying_output_dir).expanduser()
+BUYING_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -33,15 +41,21 @@ exchanges = config.EXCHANGES
 
 # Ordered list of (exchange, option_type) for a full automated run
 SCANS = [
-    (0, 0),  # calls  NYSE
-    (1, 1),  # puts   NASDAQ
-    (2, 2),  # spread ARCA
-    (1, 0),  # calls  NASDAQ
-    (2, 1),  # puts   ARCA
-    (0, 2),  # spread NYSE
-    (2, 0),  # calls  ARCA
-    (0, 1),  # puts   NYSE
-    (1, 2),  # spread NASDAQ
+    (0, 0),  # calls      NYSE
+    (1, 1),  # puts       NASDAQ
+    (2, 2),  # spread     ARCA
+    (1, 0),  # calls      NASDAQ
+    (2, 1),  # puts       ARCA
+    (0, 2),  # spread     NYSE
+    (2, 0),  # calls      ARCA
+    (0, 1),  # puts       NYSE
+    (1, 2),  # spread     NASDAQ
+    (0, 3),  # long calls NYSE
+    (1, 3),  # long calls NASDAQ
+    (2, 3),  # long calls ARCA
+    (0, 4),  # long puts  NYSE
+    (1, 4),  # long puts  NASDAQ
+    (2, 4),  # long puts  ARCA
 ]
 
 
@@ -120,6 +134,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             avg_price_30d = price_data["avg_price_30d"]
             trend = price_data["price_trend"]
             rel_std_deviation = price_data["rel_sd"]
+            hv = price_data["hv"]
 
             if rel_std_deviation > std_dev_threshold:
                 return [], False
@@ -131,9 +146,11 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if option_no == 2:
                 has_long_itm_options = spread_options.scan_long_cov_calls(options, t, price)
 
+            active_dates = config.LONG_TARGET_DATES if option_no in [3, 4] else target_dates
+
             matched = []
             for d in options:
-                if d not in target_dates:
+                if d not in active_dates:
                     continue
                 try:
                     if option_no == 0:
@@ -141,19 +158,31 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
-                            sector=sector, industry=industry, beta=beta)
+                            sector=sector, industry=industry, beta=beta, hv=hv)
                     elif option_no == 1:
                         best_contracts = put_options.scan_put_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
-                            sector=sector, industry=industry, beta=beta)
+                            sector=sector, industry=industry, beta=beta, hv=hv)
                     elif option_no == 2 and len(options) > config.SPREAD_MIN_EXPIRY_DATES and has_long_itm_options:
                         best_contracts = spread_options.scan_spread_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
-                            sector=sector, industry=industry, beta=beta)
+                            sector=sector, industry=industry, beta=beta, hv=hv)
+                    elif option_no == 3:
+                        best_contracts = long_calls.scan_long_calls(
+                            ticker, stock_exchange, d, t, price,
+                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            avg_price_30d, trend, rel_std_deviation,
+                            hv=hv, sector=sector, industry=industry, beta=beta)
+                    elif option_no == 4:
+                        best_contracts = long_puts.scan_long_puts(
+                            ticker, stock_exchange, d, t, price,
+                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            avg_price_30d, trend, rel_std_deviation,
+                            hv=hv, sector=sector, industry=industry, beta=beta)
                     else:
                         best_contracts = []
                 except Exception:
@@ -195,6 +224,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             avg_price_30d = price_data["avg_price_30d"]
             trend = price_data["price_trend"]
             rel_std_deviation = price_data["rel_sd"]
+            hv = price_data["hv"]
 
             if rel_std_deviation > std_dev_threshold:
                 return [], False
@@ -202,26 +232,38 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if len(options) == 0:
                 return [], False
 
+            active_dates = config.LONG_TARGET_DATES if option_no in [3, 4] else target_dates
+
             matched = []
             for d in options:
-                if d not in target_dates:
+                if d not in active_dates:
                     continue
                 try:
                     if option_no == 0:
                         best_contracts = cov_calls.scan_covered_calls(
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
-                            avg_price_30d, trend, rel_std_deviation)
+                            avg_price_30d, trend, rel_std_deviation, hv=hv)
                     elif option_no == 1:
                         best_contracts = put_options.scan_put_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
-                            avg_price_30d, trend, rel_std_deviation)
+                            avg_price_30d, trend, rel_std_deviation, hv=hv)
                     elif option_no == 2 and len(options) > config.SPREAD_MIN_EXPIRY_DATES:
                         best_contracts = spread_options.scan_spread_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
                             lowest_price, highest_price, avg_price, avg_price_7d,
-                            avg_price_30d, trend, rel_std_deviation)
+                            avg_price_30d, trend, rel_std_deviation, hv=hv)
+                    elif option_no == 3:
+                        best_contracts = long_calls.scan_long_calls(
+                            ticker, stock_exchange, d, t, price,
+                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            avg_price_30d, trend, rel_std_deviation, hv=hv)
+                    elif option_no == 4:
+                        best_contracts = long_puts.scan_long_puts(
+                            ticker, stock_exchange, d, t, price,
+                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            avg_price_30d, trend, rel_std_deviation, hv=hv)
                     else:
                         best_contracts = []
                 except Exception:
@@ -238,7 +280,12 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                 tickers_with_options.append(t)
             all_best_contracts.extend(contracts)
 
-    all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["option_yield"], reverse=True)
+    if option_no in [3, 4]:
+        all_best_contracts_sorted = sorted(
+            all_best_contracts,
+            key=lambda x: x["iv_hv_ratio"] if x["iv_hv_ratio"] is not None else 999)
+    else:
+        all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["option_yield"], reverse=True)
     print(f"Tot. number of contracts: {len(all_best_contracts_sorted)}")
     print()
 
@@ -286,6 +333,26 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     elif stock_exchange == 2 and option_no == 2:
         functions.write_best_options_to_json(
             OUTPUT_DIR / "best_spreads_arca.json", 2, all_best_contracts_sorted)
+    # write long calls
+    elif stock_exchange == 0 and option_no == 3:
+        functions.write_best_options_to_json(
+            BUYING_OUTPUT_DIR / "best_long_calls_nyse.json", 0, all_best_contracts_sorted)
+    elif stock_exchange == 1 and option_no == 3:
+        functions.write_best_options_to_json(
+            BUYING_OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, all_best_contracts_sorted)
+    elif stock_exchange == 2 and option_no == 3:
+        functions.write_best_options_to_json(
+            BUYING_OUTPUT_DIR / "best_long_calls_arca.json", 2, all_best_contracts_sorted)
+    # write long puts
+    elif stock_exchange == 0 and option_no == 4:
+        functions.write_best_options_to_json(
+            BUYING_OUTPUT_DIR / "best_long_puts_nyse.json", 0, all_best_contracts_sorted)
+    elif stock_exchange == 1 and option_no == 4:
+        functions.write_best_options_to_json(
+            BUYING_OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, all_best_contracts_sorted)
+    elif stock_exchange == 2 and option_no == 4:
+        functions.write_best_options_to_json(
+            BUYING_OUTPUT_DIR / "best_long_puts_arca.json", 2, all_best_contracts_sorted)
 
     end_time = time.time()
     execution_time = end_time - start_time

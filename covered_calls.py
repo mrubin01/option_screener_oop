@@ -22,6 +22,7 @@ def scan_covered_calls(
     sector: str | None = None,
     industry: str | None = None,
     beta: float | None = None,
+    hv: float = 0.0,
 ) -> list[dict[str, Any]]:
 
     matched_contracts = []
@@ -66,6 +67,8 @@ def scan_covered_calls(
         if option_yield >= config.OPTION_YIELD_THRESHOLD:
             continue
 
+        iv_hv_ratio = round(row.impliedVolatility / hv, 2) if hv > 0 else None
+
         annualized_option_yield = round(option_yield * (365 / dte), 2)
         tot_return = round(((row.strike - current_price + row.bid) / current_price) * 100, 2)
         moneyness = round(((float(row.strike) - current_price) / current_price) * 100, 2)
@@ -101,6 +104,7 @@ def scan_covered_calls(
             "avg_price": avg_price,
             "lowest_price": lowest_price,
             "main_trend": main_trend,
+            "iv_hv_ratio": iv_hv_ratio,
         }
 
         if exchange in [0, 1]:

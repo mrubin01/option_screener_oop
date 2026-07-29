@@ -11,6 +11,7 @@ from dateutil.relativedelta import relativedelta
 import alpaca_client
 from alpaca.data.requests import OptionChainRequest
 from alpaca.trading.enums import ContractType
+from alpaca.trading.requests import GetOptionContractsRequest
 
 
 def sigma_distance_to_strike(
@@ -196,6 +197,19 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
     if not chain:
         return pd.DataFrame()
 
+    oi_map = {}
+    try:
+        oi_req = GetOptionContractsRequest(
+            underlying_symbols=[symbol],
+            expiration_date=expiry_date,
+            type=ct,
+        )
+        oi_resp = alpaca_client.get_option_contracts(oi_req)
+        for c in oi_resp.option_contracts:
+            oi_map[c.symbol] = int(c.open_interest) if c.open_interest is not None else 0
+    except Exception:
+        pass
+
     rows = []
     for contract_sym, snap in chain.items():
         if snap.latest_quote is None:
@@ -208,10 +222,17 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
             "ask": snap.latest_quote.ask_price or 0.0,
             "strike": int(contract_sym[-8:]) / 1000,
             "impliedVolatility": snap.implied_volatility,
-            "openInterest": 0,
+            "openInterest": oi_map.get(contract_sym, 0),
         })
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()
+
+
+def compute_hv(close_prices: pd.Series) -> float:
+    log_returns = np.log(close_prices / close_prices.shift(1)).dropna()
+    if log_returns.empty:
+        return 0.0
+    return round(float(log_returns.std() * np.sqrt(252)), 4)
 
 
 def get_std_dev(ticker: str, price_list: pd.DataFrame | pd.Series) -> list[float]:
@@ -347,6 +368,7 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "lowest_price",
             "main_trend",
             "beta",
+            "iv_hv_ratio",
         ]
     elif exchange_no == 2:
         keys = [
@@ -377,6 +399,7 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "avg_price",
             "lowest_price",
             "main_trend",
+            "iv_hv_ratio",
         ]
     else:
         raise ValueError("Wrong exchange number!")
