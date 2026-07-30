@@ -41,21 +41,10 @@ exchanges = config.EXCHANGES
 
 # Ordered list of (exchange, option_type) for a full automated run
 SCANS = [
-    (0, 0),  # calls      NYSE
-    (1, 1),  # puts       NASDAQ
-    (2, 2),  # spread     ARCA
-    (1, 0),  # calls      NASDAQ
-    (2, 1),  # puts       ARCA
-    (0, 2),  # spread     NYSE
-    (2, 0),  # calls      ARCA
-    (0, 1),  # puts       NYSE
-    (1, 2),  # spread     NASDAQ
-    (0, 3),  # long calls NYSE
-    (1, 3),  # long calls NASDAQ
-    (2, 3),  # long calls ARCA
-    (0, 4),  # long puts  NYSE
-    (1, 4),  # long puts  NASDAQ
-    (2, 4),  # long puts  ARCA
+    (0, 0), (1, 0), (2, 0),  # covered calls  NYSE / NASDAQ / ARCA
+    (0, 1), (1, 1), (2, 1),  # put options    NYSE / NASDAQ / ARCA
+    (0, 3), (1, 3), (2, 3),  # long calls     NYSE / NASDAQ / ARCA
+    (0, 4), (1, 4), (2, 4),  # long puts      NYSE / NASDAQ / ARCA
 ]
 
 

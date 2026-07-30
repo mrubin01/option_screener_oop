@@ -5,12 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the screener
 
 ```bash
-# Run all 15 scans unattended
+# Run all 12 scans unattended
 python main.py
 ```
 
 The scan order is defined by `SCANS` in `main.py`:
-calls NYSE → puts NASDAQ → spreads ARCA → calls NASDAQ → puts ARCA → spreads NYSE → calls ARCA → puts NYSE → spreads NASDAQ → long calls NYSE → long calls NASDAQ → long calls ARCA → long puts NYSE → long puts NASDAQ → long puts ARCA
+covered calls NYSE / NASDAQ / ARCA → put options NYSE / NASDAQ / ARCA → long calls NYSE / NASDAQ / ARCA → long puts NYSE / NASDAQ / ARCA
+
+Spread scans have been removed.
 
 There are no tests or a lint step in this project.
 
@@ -62,15 +64,15 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 6. Matched contracts (dicts) are collected, sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to JSON via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
-- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 15 combinations. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are read inside `main()` from the actual exchange argument. Spread-specific filters (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) and buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`) are also defined here.
+- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 12 combinations. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are read inside `main()` from the actual exchange argument. Buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
 - `alpaca_client.py` — initializes `StockHistoricalDataClient`, `OptionHistoricalDataClient`, and `TradingClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and four rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`, `get_option_contracts`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; computes HV (annualised historical volatility from 90-day log returns) in `get_price_stats()`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame, fetches open interest via `TradingClient.get_option_contracts`), `compute_hv`, `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`; includes `iv_hv_ratio` per contract
 - `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern; includes `iv_hv_ratio` per contract
 - `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` (alias of `scan_covered_calls` from covered_calls)
-- `long_calls.py` — `scan_long_calls` for buying-side call scans; filters: uptrend only, OTM 0–10%, ask $0.20–$2.00, OI ≥ 100 (when available), iv_hv_ratio ≤ 0.8
-- `long_puts.py` — `scan_long_puts` for buying-side put scans; filters: downtrend only, OTM 0–10%, ask $0.20–$2.00, OI ≥ 100 (when available), iv_hv_ratio ≤ 0.8
+- `long_calls.py` — `scan_long_calls` for buying-side call scans; filters: uptrend or sideways, OTM 0–10%, ask $0.20–$2.00, OI ≥ 50 (when available), iv_hv_ratio ≤ 1.0
+- `long_puts.py` — `scan_long_puts` for buying-side put scans; filters: downtrend or sideways, OTM 0–10%, ask $0.20–$2.00, OI ≥ 50 (when available), iv_hv_ratio ≤ 1.0
 
 ## Key metrics
 
@@ -85,7 +87,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 ## Output
 
-**Selling-side** JSON files are written to `OUTPUT_DIR`: `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, `best_spreads_arca.json`, etc. Sorted by `option_yield` descending.
+**Selling-side** JSON files are written to `OUTPUT_DIR`: `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, etc. Sorted by `option_yield` descending.
 
 **Buying-side** JSON files are written to `BUYING_OUTPUT_DIR` (`~/options_buying_side`): `best_long_calls_nyse.json`, `best_long_puts_nasdaq.json`, etc. Sorted by `iv_hv_ratio` ascending (most underpriced first).
 
@@ -140,7 +142,7 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 
 | Variable | Values | Effect |
 |---|---|---|
-| `TYPE` | 0=call, 1=put, 2=spread | No longer edited — full run cycles all types |
+| `TYPE` | 0=call, 1=put | No longer edited — full run cycles all types |
 | `TARGET_DATES` | auto-computed | Next 3 Fridays from today; no manual edit needed |
 | `SCOPE` | 0=tickers with options only, 1=full list | Input ticker file |
 | `RISK_FREE_RATE` | float (%) | 1-month Treasury rate used for delta calculation |
@@ -150,12 +152,10 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 | `ARCA_MAX_STOCK_PRICE` | default 200 | Price ceiling for ARCA tickers |
 | `NYSE_NASDAQ_MIN_BID_PRICE` | default 0.2 | Minimum bid for NYSE/NASDAQ contracts |
 | `ARCA_MIN_BID_PRICE` | default 0.5 | Minimum bid for ARCA contracts |
-| `SPREAD_MIN_EXPIRY_DATES` | default 10 | Min number of expiry dates a ticker must have for spread scans |
-| `SPREAD_MIN_ITM_DISTANCE` | default 6 | Min $ distance between strike and price for ITM long call in spread |
 | `LONG_TARGET_DATES` | auto-computed | 3rd and 4th Fridays from today; used for buying scans |
 | `LONG_MAX_MONEYNESS` | default 10 | Max % OTM for long call/put contracts |
-| `LONG_MAX_IV_HV_RATIO` | default 0.8 | Max IV/HV ratio — only buy when options are underpriced vs realised vol |
-| `LONG_MIN_OPEN_INTEREST` | default 100 | Min open interest (only applied when OI data is available) |
+| `LONG_MAX_IV_HV_RATIO` | default 1.0 | Max IV/HV ratio — only buy when options are at or below realised vol |
+| `LONG_MIN_OPEN_INTEREST` | default 50 | Min open interest (only applied when OI data is available) |
 | `LONG_MIN_ASK` | default 0.20 | Min ask price for long contracts |
 | `LONG_MAX_ASK` | default 2.00 | Max ask price for long contracts |
 
