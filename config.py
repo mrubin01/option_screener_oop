@@ -16,7 +16,7 @@ STD_DEV_THRESHOLD = 15
 STRIKE_PRICE_THRESHOLD = 1.5  # overridden inside main() per exchange
 SCOPE = 0  # 0 only tickers with options, 1 whole ticker list
 
-OPTION_TYPE = ["Call", "Put", "Spread", "Long Call", "Long Put"]
+OPTION_TYPE = ["Call", "Put", "Spread", "Long Call", "Long Put", "Combined Call", "Combined Put"]
 EXCHANGES = ["NYSE", "NASDAQ", "ARCA"]
 
 RISK_FREE_RATE = 3.86  # 1-month Treasury rate

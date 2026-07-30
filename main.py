@@ -39,12 +39,10 @@ scope = config.SCOPE
 option_type = config.OPTION_TYPE
 exchanges = config.EXCHANGES
 
-# Ordered list of (exchange, option_type) for a full automated run
+# 6 scans: each ticker is fetched once per exchange and produces both selling and buying JSONs
 SCANS = [
-    (0, 0), (1, 0), (2, 0),  # covered calls  NYSE / NASDAQ / ARCA
-    (0, 1), (1, 1), (2, 1),  # put options    NYSE / NASDAQ / ARCA
-    (0, 3), (1, 3), (2, 3),  # long calls     NYSE / NASDAQ / ARCA
-    (0, 4), (1, 4), (2, 4),  # long puts      NYSE / NASDAQ / ARCA
+    (0, 5), (1, 5), (2, 5),  # combined calls  NYSE / NASDAQ / ARCA
+    (0, 6), (1, 6), (2, 6),  # combined puts   NYSE / NASDAQ / ARCA
 ]
 
 
@@ -92,16 +90,17 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     print(f"|-- Scanning {option_type[option_no]} options in {exchanges[stock_exchange]} --|")
     print()
 
-    all_best_contracts = []
+    all_selling_contracts = []
+    all_buying_contracts = []
     tickers_with_options = []
 
     if stock_exchange in [0, 1]:
 
-        def _process_equity_ticker(t: str) -> tuple[list[dict], bool]:
+        def _process_equity_ticker(t: str) -> tuple[list[dict], list[dict], bool]:
             ticker = Assets.Equity(t, exchanges[stock_exchange])
             ticker_data = ticker.get_info()
             if not ticker_data:
-                return [], False
+                return [], [], False
 
             price = float(ticker_data["price"])
             options = ticker_data["options"]
@@ -110,11 +109,11 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             beta = functions.normalize_nullable_float(ticker_data["beta"])
 
             if price > max_stock_price:
-                return [], False
+                return [], [], False
 
             price_data = ticker.get_price_stats()
             if not price_data:
-                return [], False
+                return [], [], False
 
             lowest_price = price_data["low"]
             highest_price = price_data["high"]
@@ -126,17 +125,46 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             hv = price_data["hv"]
 
             if rel_std_deviation > std_dev_threshold:
-                return [], False
+                return [], [], False
 
             if len(options) == 0:
-                return [], False
+                return [], [], False
 
+            # Combined modes: selling on TARGET_DATES, buying on LONG_TARGET_DATES — single ticker pass
+            if option_no in [5, 6]:
+                scan_sell = cov_calls.scan_covered_calls if option_no == 5 else put_options.scan_put_options
+                scan_buy = long_calls.scan_long_calls if option_no == 5 else long_puts.scan_long_puts
+                selling = []
+                buying = []
+                for d in options:
+                    if d in target_dates:
+                        try:
+                            best = scan_sell(
+                                ticker, stock_exchange, d, min_bid_price, t, price,
+                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                avg_price_30d, trend, rel_std_deviation,
+                                sector=sector, industry=industry, beta=beta, hv=hv)
+                            selling.extend(best)
+                        except Exception:
+                            pass
+                    if d in config.LONG_TARGET_DATES:
+                        try:
+                            best = scan_buy(
+                                ticker, stock_exchange, d, t, price,
+                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                avg_price_30d, trend, rel_std_deviation,
+                                hv=hv, sector=sector, industry=industry, beta=beta)
+                            buying.extend(best)
+                        except Exception:
+                            pass
+                return selling, buying, True
+
+            # Single modes (backward compat)
             has_long_itm_options = False
             if option_no == 2:
                 has_long_itm_options = spread_options.scan_long_cov_calls(options, t, price)
 
             active_dates = config.LONG_TARGET_DATES if option_no in [3, 4] else target_dates
-
             matched = []
             for d in options:
                 if d not in active_dates:
@@ -178,33 +206,36 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                     continue
                 matched.extend(best_contracts)
 
-            return matched, True
+            if option_no in [3, 4]:
+                return [], matched, True
+            return matched, [], True
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             results = list(executor.map(_process_equity_ticker, ticker_list))
 
-        for t, (contracts, had_options) in zip(ticker_list, results):
+        for t, (selling, buying, had_options) in zip(ticker_list, results):
             if had_options:
                 tickers_with_options.append(t)
-            all_best_contracts.extend(contracts)
+            all_selling_contracts.extend(selling)
+            all_buying_contracts.extend(buying)
 
     elif stock_exchange == 2:
 
-        def _process_etf_ticker(t: str) -> tuple[list[dict], bool]:
+        def _process_etf_ticker(t: str) -> tuple[list[dict], list[dict], bool]:
             ticker = Assets.ETF(t, exchanges[stock_exchange])
             ticker_data = ticker.get_info_etf()
             if not ticker_data:
-                return [], False
+                return [], [], False
 
             price = float(ticker_data["price"])
             options = ticker_data["options"]
 
             if price > max_stock_price:
-                return [], False
+                return [], [], False
 
             price_data = ticker.get_price_stats()
             if not price_data:
-                return [], False
+                return [], [], False
 
             lowest_price = price_data["low"]
             highest_price = price_data["high"]
@@ -216,13 +247,40 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             hv = price_data["hv"]
 
             if rel_std_deviation > std_dev_threshold:
-                return [], False
+                return [], [], False
 
             if len(options) == 0:
-                return [], False
+                return [], [], False
 
+            # Combined modes
+            if option_no in [5, 6]:
+                scan_sell = cov_calls.scan_covered_calls if option_no == 5 else put_options.scan_put_options
+                scan_buy = long_calls.scan_long_calls if option_no == 5 else long_puts.scan_long_puts
+                selling = []
+                buying = []
+                for d in options:
+                    if d in target_dates:
+                        try:
+                            best = scan_sell(
+                                ticker, stock_exchange, d, min_bid_price, t, price,
+                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                avg_price_30d, trend, rel_std_deviation, hv=hv)
+                            selling.extend(best)
+                        except Exception:
+                            pass
+                    if d in config.LONG_TARGET_DATES:
+                        try:
+                            best = scan_buy(
+                                ticker, stock_exchange, d, t, price,
+                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                avg_price_30d, trend, rel_std_deviation, hv=hv)
+                            buying.extend(best)
+                        except Exception:
+                            pass
+                return selling, buying, True
+
+            # Single modes (backward compat)
             active_dates = config.LONG_TARGET_DATES if option_no in [3, 4] else target_dates
-
             matched = []
             for d in options:
                 if d not in active_dates:
@@ -259,23 +317,25 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                     continue
                 matched.extend(best_contracts)
 
-            return matched, True
+            if option_no in [3, 4]:
+                return [], matched, True
+            return matched, [], True
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             results = list(executor.map(_process_etf_ticker, ticker_list))
 
-        for t, (contracts, had_options) in zip(ticker_list, results):
+        for t, (selling, buying, had_options) in zip(ticker_list, results):
             if had_options:
                 tickers_with_options.append(t)
-            all_best_contracts.extend(contracts)
+            all_selling_contracts.extend(selling)
+            all_buying_contracts.extend(buying)
 
-    if option_no in [3, 4]:
-        all_best_contracts_sorted = sorted(
-            all_best_contracts,
-            key=lambda x: x["iv_hv_ratio"] if x["iv_hv_ratio"] is not None else 999)
-    else:
-        all_best_contracts_sorted = sorted(all_best_contracts, key=lambda x: x["option_yield"], reverse=True)
-    print(f"Tot. number of contracts: {len(all_best_contracts_sorted)}")
+    selling_sorted = sorted(all_selling_contracts, key=lambda x: x["option_yield"], reverse=True)
+    buying_sorted = sorted(
+        all_buying_contracts,
+        key=lambda x: x["iv_hv_ratio"] if x["iv_hv_ratio"] is not None else 999)
+
+    print(f"Selling contracts: {len(selling_sorted)}, Buying contracts: {len(buying_sorted)}")
     print()
 
     # write list of tickers with options
@@ -286,62 +346,59 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     elif stock_exchange == 2 and scope == 1:
         functions.write_tickers_to_file(tickers_with_options, str(TICKERS_DIR / "arca_options.txt"))
 
-    # write NYSE covered calls
-    if stock_exchange == 0 and option_no == 0:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_cov_calls_nyse.json", 0, all_best_contracts_sorted)
-    # write NYSE put options
-    if stock_exchange == 0 and option_no == 1:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_put_options_nyse.json", 0, all_best_contracts_sorted)
-    # write NYSE spread options
-    if stock_exchange == 0 and option_no == 2:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_spreads_nyse.json", 0, all_best_contracts_sorted)
-    # write NASDAQ covered calls
-    elif stock_exchange == 1 and option_no == 0:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_cov_calls_nasdaq.json", 1, all_best_contracts_sorted)
-    # write NASDAQ put options
-    elif stock_exchange == 1 and option_no == 1:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_put_options_nasdaq.json", 1, all_best_contracts_sorted)
-    # write NASDAQ spread options
-    elif stock_exchange == 1 and option_no == 2:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_spreads_nasdaq.json", 1, all_best_contracts_sorted)
-    # write ARCA covered calls
-    elif stock_exchange == 2 and option_no == 0:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_cov_calls_arca.json", 2, all_best_contracts_sorted)
-    # write ARCA put options
-    elif stock_exchange == 2 and option_no == 1:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_put_options_arca.json", 2, all_best_contracts_sorted)
-    # write ARCA spread options
-    elif stock_exchange == 2 and option_no == 2:
-        functions.write_best_options_to_json(
-            OUTPUT_DIR / "best_spreads_arca.json", 2, all_best_contracts_sorted)
-    # write long calls
-    elif stock_exchange == 0 and option_no == 3:
-        functions.write_best_options_to_json(
-            BUYING_OUTPUT_DIR / "best_long_calls_nyse.json", 0, all_best_contracts_sorted)
-    elif stock_exchange == 1 and option_no == 3:
-        functions.write_best_options_to_json(
-            BUYING_OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, all_best_contracts_sorted)
-    elif stock_exchange == 2 and option_no == 3:
-        functions.write_best_options_to_json(
-            BUYING_OUTPUT_DIR / "best_long_calls_arca.json", 2, all_best_contracts_sorted)
-    # write long puts
-    elif stock_exchange == 0 and option_no == 4:
-        functions.write_best_options_to_json(
-            BUYING_OUTPUT_DIR / "best_long_puts_nyse.json", 0, all_best_contracts_sorted)
-    elif stock_exchange == 1 and option_no == 4:
-        functions.write_best_options_to_json(
-            BUYING_OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, all_best_contracts_sorted)
-    elif stock_exchange == 2 and option_no == 4:
-        functions.write_best_options_to_json(
-            BUYING_OUTPUT_DIR / "best_long_puts_arca.json", 2, all_best_contracts_sorted)
+    # Combined call scan: covered calls (selling) + long calls (buying)
+    if option_no == 5:
+        if stock_exchange == 0:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_nyse.json", 0, selling_sorted)
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nyse.json", 0, buying_sorted)
+        elif stock_exchange == 1:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_nasdaq.json", 1, selling_sorted)
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, buying_sorted)
+        elif stock_exchange == 2:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_arca.json", 2, selling_sorted)
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_arca.json", 2, buying_sorted)
+
+    # Combined put scan: put options (selling) + long puts (buying)
+    elif option_no == 6:
+        if stock_exchange == 0:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_nyse.json", 0, selling_sorted)
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nyse.json", 0, buying_sorted)
+        elif stock_exchange == 1:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_nasdaq.json", 1, selling_sorted)
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, buying_sorted)
+        elif stock_exchange == 2:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_arca.json", 2, selling_sorted)
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_arca.json", 2, buying_sorted)
+
+    # Single modes (backward compat)
+    elif option_no == 0:
+        if stock_exchange == 0:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_nyse.json", 0, selling_sorted)
+        elif stock_exchange == 1:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_nasdaq.json", 1, selling_sorted)
+        elif stock_exchange == 2:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_arca.json", 2, selling_sorted)
+    elif option_no == 1:
+        if stock_exchange == 0:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_nyse.json", 0, selling_sorted)
+        elif stock_exchange == 1:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_nasdaq.json", 1, selling_sorted)
+        elif stock_exchange == 2:
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_arca.json", 2, selling_sorted)
+    elif option_no == 3:
+        if stock_exchange == 0:
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nyse.json", 0, buying_sorted)
+        elif stock_exchange == 1:
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, buying_sorted)
+        elif stock_exchange == 2:
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_arca.json", 2, buying_sorted)
+    elif option_no == 4:
+        if stock_exchange == 0:
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nyse.json", 0, buying_sorted)
+        elif stock_exchange == 1:
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, buying_sorted)
+        elif stock_exchange == 2:
+            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_arca.json", 2, buying_sorted)
 
     end_time = time.time()
     execution_time = end_time - start_time
