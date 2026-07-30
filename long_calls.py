@@ -31,7 +31,7 @@ def scan_long_calls(
         return []
 
     main_trend = functions.compute_main_trend(current_price, avg_price, avg_price_7d, avg_price_30d, trend)
-    if main_trend != 1:
+    if main_trend < 0:
         return []
 
     dte = functions.days_to_expiration(option_date)
