@@ -44,27 +44,38 @@ class _RateLimiter:
             time.sleep(0.05)
 
 
-_limiter = _RateLimiter(180)
+_limiter = _RateLimiter(120)
+
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 2.0
+
+
+def _call_with_retry(fn, req):
+    for attempt in range(_MAX_RETRIES):
+        _limiter.acquire()
+        try:
+            return fn(req)
+        except Exception as e:
+            if "too many requests" in str(e).lower() and attempt < _MAX_RETRIES - 1:
+                time.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
+                continue
+            raise
 
 
 def get_latest_trades(req):
-    _limiter.acquire()
-    return stock_client.get_stock_latest_trade(req)
+    return _call_with_retry(stock_client.get_stock_latest_trade, req)
 
 
 def get_stock_bars(req):
-    _limiter.acquire()
-    return stock_client.get_stock_bars(req)
+    return _call_with_retry(stock_client.get_stock_bars, req)
 
 
 def get_option_chain(req):
-    _limiter.acquire()
-    return option_client.get_option_chain(req)
+    return _call_with_retry(option_client.get_option_chain, req)
 
 
 def get_option_contracts(req):
-    _limiter.acquire()
-    return trading_client.get_option_contracts(req)
+    return _call_with_retry(trading_client.get_option_contracts, req)
 
 
 if __name__ == "__main__":
