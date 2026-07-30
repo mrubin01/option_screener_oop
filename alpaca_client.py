@@ -45,7 +45,6 @@ class _RateLimiter:
 
 
 _limiter = _RateLimiter(180)
-_yf_limiter = _RateLimiter(50)
 
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0
@@ -61,10 +60,6 @@ def _call_with_retry(fn, req):
                 time.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
                 continue
             raise
-
-
-def yf_acquire():
-    _yf_limiter.acquire()
 
 
 def get_latest_trades(req):

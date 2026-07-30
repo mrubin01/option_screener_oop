@@ -105,7 +105,6 @@ class Equity(Asset):
             price = float(trade[self._symbol].price)
 
             # yfinance retained for options list and fundamentals only
-            alpaca_client.yf_acquire()
             stock = yf.Ticker(self._symbol)
             options = stock.options
             if not options:
@@ -145,7 +144,6 @@ class ETF(Asset):
             price = float(trade[self._symbol].price)
 
             # yfinance retained for options list only; no .info call needed for ETFs
-            alpaca_client.yf_acquire()
             stock = yf.Ticker(self._symbol)
             options = stock.options
             if not options:
