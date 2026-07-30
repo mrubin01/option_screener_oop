@@ -5,12 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the screener
 
 ```bash
-# Run all 12 scans unattended
+# Run all 6 scans unattended
 python main.py
 ```
 
 The scan order is defined by `SCANS` in `main.py`:
-covered calls NYSE / NASDAQ / ARCA → put options NYSE / NASDAQ / ARCA → long calls NYSE / NASDAQ / ARCA → long puts NYSE / NASDAQ / ARCA
+combined calls NYSE / NASDAQ / ARCA → combined puts NYSE / NASDAQ / ARCA
+
+Each scan processes every ticker once and writes two JSON files: one selling-side (covered calls or put options) and one buying-side (long calls or long puts). This halves the number of scans compared to running selling and buying separately.
 
 Spread scans have been removed.
 
@@ -60,11 +62,11 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
 3. It calls `.get_info()` / `.get_info_etf()` and `.get_price_stats()` — both return dicts or `{}` on failure
 4. Pre-filters: price > exchange threshold and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker
-5. The matching option module's `scan_*` function is called for each expiry date in `config.TARGET_DATES` (next 3 Fridays) for selling scans, or `config.LONG_TARGET_DATES` (3rd and 4th Fridays) for buying scans
-6. Matched contracts (dicts) are collected, sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to JSON via `functions.write_best_options_to_json()`
+5. In combined mode (the default), both selling scan (`scan_covered_calls` or `scan_put_options`) and buying scan (`scan_long_calls` or `scan_long_puts`) run for the same ticker in one pass — selling dates use `config.TARGET_DATES` (next 3 Fridays), buying dates use `config.LONG_TARGET_DATES` (3rd and 4th Fridays)
+6. Matched contracts are collected in two separate lists, sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to two JSON files per scan via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
-- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 12 combinations. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are read inside `main()` from the actual exchange argument. Buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
+- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 6 combined scans. `OPTION_TYPE` list has indices 0–6; indices 5 ("Combined Call") and 6 ("Combined Put") are used by `SCANS`. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are read inside `main()` from the actual exchange argument. Buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
 - `alpaca_client.py` — initializes `StockHistoricalDataClient`, `OptionHistoricalDataClient`, and `TradingClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and four rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`, `get_option_contracts`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; computes HV (annualised historical volatility from 90-day log returns) in `get_price_stats()`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame, fetches open interest via `TradingClient.get_option_contracts`), `compute_hv`, `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
