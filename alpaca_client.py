@@ -48,13 +48,24 @@ _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0
 
 
+def _is_retryable(e: Exception) -> bool:
+    msg = str(e).lower()
+    return (
+        "too many requests" in msg
+        or "connection aborted" in msg
+        or "remote end closed" in msg
+        or "remotedisconnected" in msg
+        or "connection reset" in msg
+    )
+
+
 def _call_with_retry(fn, req):
     for attempt in range(_MAX_RETRIES):
         _limiter.acquire()
         try:
             return fn(req)
         except Exception as e:
-            if "too many requests" in str(e).lower() and attempt < _MAX_RETRIES - 1:
+            if _is_retryable(e) and attempt < _MAX_RETRIES - 1:
                 time.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
                 continue
             raise
