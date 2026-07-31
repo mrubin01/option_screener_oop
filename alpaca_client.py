@@ -3,7 +3,6 @@ import time
 import threading
 from dotenv import load_dotenv
 from alpaca.data import StockHistoricalDataClient, OptionHistoricalDataClient
-from alpaca.trading.client import TradingClient
 
 load_dotenv()
 
@@ -15,7 +14,6 @@ if not _api_key or not _secret_key:
 
 stock_client = StockHistoricalDataClient(_api_key, _secret_key)
 option_client = OptionHistoricalDataClient(_api_key, _secret_key)
-trading_client = TradingClient(_api_key, _secret_key, paper=False)
 
 
 class _RateLimiter:
@@ -73,9 +71,6 @@ def get_stock_bars(req):
 def get_option_chain(req):
     return _call_with_retry(option_client.get_option_chain, req)
 
-
-def get_option_contracts(req):
-    return _call_with_retry(trading_client.get_option_contracts, req)
 
 
 if __name__ == "__main__":
