@@ -1,4 +1,5 @@
 import json
+import yfinance as yf
 import numpy as np
 from sklearn.linear_model import LinearRegression
 import pandas as pd
@@ -194,6 +195,20 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
     if not chain:
         return pd.DataFrame()
 
+    oi_map = {}
+    try:
+        yf_chain = yf.Ticker(symbol).option_chain(expiry_date)
+        yf_df = yf_chain.calls if ct == ContractType.CALL else yf_chain.puts
+        if yf_df is not None and not yf_df.empty and "openInterest" in yf_df.columns:
+            oi_map = (
+                yf_df.set_index("contractSymbol")["openInterest"]
+                .fillna(0)
+                .astype(int)
+                .to_dict()
+            )
+    except Exception:
+        pass
+
     rows = []
     for contract_sym, snap in chain.items():
         if snap.latest_quote is None:
@@ -206,7 +221,7 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
             "ask": snap.latest_quote.ask_price or 0.0,
             "strike": int(contract_sym[-8:]) / 1000,
             "impliedVolatility": snap.implied_volatility,
-            "openInterest": 0,
+            "openInterest": oi_map.get(contract_sym, 0),
         })
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()
