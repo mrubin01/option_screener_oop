@@ -49,18 +49,17 @@ BUYING_OUTPUT_DIR=~/options_buying_side
 
 ## Architecture
 
-The screener iterates over a ticker list, fetches market data via Alpaca (price, historical bars, options chain) and yfinance (expiry dates list, sector/industry/beta), applies filters, and writes matching option contracts to JSON files consumed by a separate `options-saas` frontend.
+The screener iterates over a ticker list, fetches market data via Alpaca (price, historical bars, options chain) and yfinance (expiry dates list), applies filters, and writes matching option contracts to JSON files consumed by a separate `options-saas` frontend.
 
-**Ticker files** live in `tickers/` (gitignored — runtime data, updated each full scan):
-- `nyse_options.txt`, `nasdaq_options.txt`, `arca_options.txt` — filtered lists (tickers with options, `SCOPE=0`)
-- `nyse_full.txt`, `nasdaq_full.txt`, `arca_full.txt` — full exchange lists (`SCOPE=1`)
-
-`main.py` resolves paths via `TICKERS_DIR = Path(__file__).parent / "tickers"`.
+**Ticker files** are managed by external software and live in `~/shared_data/stock_options/`:
+- `stocks_with_options_nyse.csv`, `stocks_with_options_nasdaq.csv`, `stocks_with_options_arca.csv`
+- Each line: `ticker,sector,industry,beta` (e.g. `AI,Technology,Software - Infrastructure,2.052`)
+- `main.py` reads these via `_read_tickers_csv()` at the start of each scan; sector/industry/beta are parsed here and passed directly to the scan functions — no yfinance `.info` call needed.
 
 **Data flow:**
-1. `main.py` reads a ticker list from `tickers/` (file chosen by `SCOPE` in `config.py` and the exchange passed to `main()`)
+1. `main.py` reads `~/shared_data/stock_options/stocks_with_options_{exchange}.csv` and parses ticker + fundamentals
 2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
-3. It calls `.get_info()` / `.get_info_etf()` and `.get_price_stats()` — both return dicts or `{}` on failure
+3. It calls `.get_info()` / `.get_info_etf()` (Alpaca price + yfinance options expiry list) and `.get_price_stats()` — both return dicts or `{}` on failure
 4. Pre-filters: price > exchange threshold and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker
 5. In combined mode (the default), both selling scan (`scan_covered_calls` or `scan_put_options`) and buying scan (`scan_long_calls` or `scan_long_puts`) run for the same ticker in one pass — selling dates use `config.TARGET_DATES` (next 3 Fridays), buying dates use `config.LONG_TARGET_DATES` (3rd and 4th Fridays)
 6. Matched contracts are collected in two separate lists, sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to two JSON files per scan via `functions.write_best_options_to_json()`
@@ -68,7 +67,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 **Module responsibilities:**
 - `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 6 combined scans. `OPTION_TYPE` list has indices 0–6; indices 5 ("Combined Call") and 6 ("Combined Put") are used by `SCANS`. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are read inside `main()` from the actual exchange argument. Buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
 - `alpaca_client.py` — initializes `StockHistoricalDataClient`, `OptionHistoricalDataClient`, and `TradingClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and four rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`, `get_option_contracts`) used by `Assets.py` and `functions.py`
-- `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; computes HV (annualised historical volatility from 90-day log returns) in `get_price_stats()`; options expiry list and fundamentals (sector/industry/beta) still via yfinance
+- `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest`; computes HV (annualised historical volatility from 90-day log returns) in `get_price_stats()`; options expiry list via yfinance only (sector/industry/beta now come from the CSV files, not yfinance)
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame, fetches open interest via `TradingClient.get_option_contracts`), `compute_hv`, `compute_main_trend`, `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`; includes `iv_hv_ratio` per contract
 - `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern; includes `iv_hv_ratio` per contract
@@ -134,9 +133,11 @@ The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in 
 - Open interest per contract → `GetOptionContractsRequest` via `TradingClient` in `functions.get_alpaca_option_chain()`
 - Production limit: **200 requests/minute** (rate limiter set to 180 as a safety buffer)
 
-**yfinance** (retained for stable/non-real-time data only):
+**yfinance** (retained for options expiry list only):
 - Options expiry date list → `yf.Ticker(symbol).options` in `Assets.get_info()` / `get_info_etf()`
-- Sector, industry, beta → `yf.Ticker(symbol).info` in `Assets.Equity.get_info()` (equities only)
+
+**External CSV files** (`~/shared_data/stock_options/`):
+- Sector, industry, beta → parsed by `main._read_tickers_csv()` at scan startup; no yfinance `.info` call needed
 
 yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 

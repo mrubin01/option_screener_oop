@@ -14,8 +14,7 @@ import long_calls
 import long_puts
 from concurrent.futures import ThreadPoolExecutor
 
-BASE_DIR = Path(__file__).parent
-TICKERS_DIR = BASE_DIR / "tickers"
+STOCK_OPTIONS_DIR = Path("~/shared_data/stock_options").expanduser()
 
 _output_dir = os.getenv("OUTPUT_DIR")
 if not _output_dir:
@@ -34,7 +33,6 @@ pd.set_option("display.max_rows", None)
 
 target_dates = config.TARGET_DATES
 std_dev_threshold = config.STD_DEV_THRESHOLD
-scope = config.SCOPE
 
 option_type = config.OPTION_TYPE
 exchanges = config.EXCHANGES
@@ -44,6 +42,36 @@ SCANS = [
     (0, 5), (1, 5), (2, 5),  # combined calls  NYSE / NASDAQ / ARCA
     (0, 6), (1, 6), (2, 6),  # combined puts   NYSE / NASDAQ / ARCA
 ]
+
+
+def _read_tickers_csv(csv_path: Path) -> tuple[list[str], dict[str, dict]]:
+    """Read exchange CSV (ticker,sector,industry,beta) and return ticker list + fundamentals dict."""
+    ticker_list = []
+    fundamentals = {}
+    with open(csv_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(",")
+            ticker = parts[0].strip()
+            if not ticker:
+                continue
+            ticker_list.append(ticker)
+            if len(parts) >= 4:
+                sector = functions.normalize_nullable_fields(parts[1].strip() or None)
+                # industry may contain commas, so join everything between sector and beta
+                industry = functions.normalize_nullable_fields(",".join(parts[2:-1]).strip() or None)
+                try:
+                    beta = float(parts[-1].strip())
+                except ValueError:
+                    beta = None
+            else:
+                sector = None
+                industry = None
+                beta = None
+            fundamentals[ticker] = {"sector": sector, "industry": industry, "beta": beta}
+    return ticker_list, fundamentals
 
 
 def main(exchange_number: int = 0, option_type_input: int | None = None):
@@ -63,27 +91,17 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
     print("|--------------------------------------------------------------------------|")
 
-    match (stock_exchange, scope):
-        case (0, 0):
-            ticker_file = TICKERS_DIR / "nyse_options.txt"
-        case (1, 0):
-            ticker_file = TICKERS_DIR / "nasdaq_options.txt"
-        case (2, 0):
-            ticker_file = TICKERS_DIR / "arca_options.txt"
-        case (0, 1):
-            ticker_file = TICKERS_DIR / "nyse_full.txt"
-        case (1, 1):
-            ticker_file = TICKERS_DIR / "nasdaq_full.txt"
-        case (2, 1):
-            ticker_file = TICKERS_DIR / "arca_full.txt"
-        case _:
-            print("Wrong values!")
-            sys.exit()
+    if stock_exchange == 0:
+        csv_file = STOCK_OPTIONS_DIR / "stocks_with_options_nyse.csv"
+    elif stock_exchange == 1:
+        csv_file = STOCK_OPTIONS_DIR / "stocks_with_options_nasdaq.csv"
+    elif stock_exchange == 2:
+        csv_file = STOCK_OPTIONS_DIR / "stocks_with_options_arca.csv"
+    else:
+        print("Wrong exchange number!")
+        sys.exit()
 
-    with open(ticker_file, "r") as my_file:
-        data = my_file.read()
-    data_into_list = data.replace('\n', ', ').split(", ")
-    ticker_list = list(filter(None, data_into_list))
+    ticker_list, ticker_fundamentals = _read_tickers_csv(csv_file)
     # ticker_list = ["XBI", "UPRO", "GDXJ"]
 
     start_time = time.time()
@@ -92,28 +110,28 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
     all_selling_contracts = []
     all_buying_contracts = []
-    tickers_with_options = []
 
     if stock_exchange in [0, 1]:
 
-        def _process_equity_ticker(t: str) -> tuple[list[dict], list[dict], bool]:
+        def _process_equity_ticker(t: str) -> tuple[list[dict], list[dict]]:
             ticker = Assets.Equity(t, exchanges[stock_exchange])
             ticker_data = ticker.get_info()
             if not ticker_data:
-                return [], [], False
+                return [], []
 
             price = float(ticker_data["price"])
             options = ticker_data["options"]
-            sector = functions.normalize_nullable_fields(ticker_data["sector"])
-            industry = functions.normalize_nullable_fields(ticker_data["industry"])
-            beta = functions.normalize_nullable_float(ticker_data["beta"])
+            fund = ticker_fundamentals.get(t, {})
+            sector = fund.get("sector")
+            industry = fund.get("industry")
+            beta = fund.get("beta")
 
             if price > max_stock_price:
-                return [], [], False
+                return [], []
 
             price_data = ticker.get_price_stats()
             if not price_data:
-                return [], [], False
+                return [], []
 
             lowest_price = price_data["low"]
             highest_price = price_data["high"]
@@ -125,10 +143,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             hv = price_data["hv"]
 
             if rel_std_deviation > std_dev_threshold:
-                return [], [], False
+                return [], []
 
             if len(options) == 0:
-                return [], [], False
+                return [], []
 
             # Combined modes: selling on TARGET_DATES, buying on LONG_TARGET_DATES — single ticker pass
             if option_no in [5, 6]:
@@ -157,7 +175,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             buying.extend(best)
                         except Exception:
                             pass
-                return selling, buying, True
+                return selling, buying
 
             # Single modes (backward compat)
             has_long_itm_options = False
@@ -207,35 +225,33 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                 matched.extend(best_contracts)
 
             if option_no in [3, 4]:
-                return [], matched, True
-            return matched, [], True
+                return [], matched
+            return matched, []
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             results = list(executor.map(_process_equity_ticker, ticker_list))
 
-        for t, (selling, buying, had_options) in zip(ticker_list, results):
-            if had_options:
-                tickers_with_options.append(t)
+        for selling, buying in results:
             all_selling_contracts.extend(selling)
             all_buying_contracts.extend(buying)
 
     elif stock_exchange == 2:
 
-        def _process_etf_ticker(t: str) -> tuple[list[dict], list[dict], bool]:
+        def _process_etf_ticker(t: str) -> tuple[list[dict], list[dict]]:
             ticker = Assets.ETF(t, exchanges[stock_exchange])
             ticker_data = ticker.get_info_etf()
             if not ticker_data:
-                return [], [], False
+                return [], []
 
             price = float(ticker_data["price"])
             options = ticker_data["options"]
 
             if price > max_stock_price:
-                return [], [], False
+                return [], []
 
             price_data = ticker.get_price_stats()
             if not price_data:
-                return [], [], False
+                return [], []
 
             lowest_price = price_data["low"]
             highest_price = price_data["high"]
@@ -247,10 +263,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             hv = price_data["hv"]
 
             if rel_std_deviation > std_dev_threshold:
-                return [], [], False
+                return [], []
 
             if len(options) == 0:
-                return [], [], False
+                return [], []
 
             # Combined modes
             if option_no in [5, 6]:
@@ -277,7 +293,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             buying.extend(best)
                         except Exception:
                             pass
-                return selling, buying, True
+                return selling, buying
 
             # Single modes (backward compat)
             active_dates = config.LONG_TARGET_DATES if option_no in [3, 4] else target_dates
@@ -318,15 +334,13 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                 matched.extend(best_contracts)
 
             if option_no in [3, 4]:
-                return [], matched, True
-            return matched, [], True
+                return [], matched
+            return matched, []
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             results = list(executor.map(_process_etf_ticker, ticker_list))
 
-        for t, (selling, buying, had_options) in zip(ticker_list, results):
-            if had_options:
-                tickers_with_options.append(t)
+        for selling, buying in results:
             all_selling_contracts.extend(selling)
             all_buying_contracts.extend(buying)
 
@@ -337,14 +351,6 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
     print(f"Selling contracts: {len(selling_sorted)}, Buying contracts: {len(buying_sorted)}")
     print()
-
-    # write list of tickers with options
-    if stock_exchange == 0 and scope == 1:
-        functions.write_tickers_to_file(tickers_with_options, str(TICKERS_DIR / "nyse_options.txt"))
-    elif stock_exchange == 1 and scope == 1:
-        functions.write_tickers_to_file(tickers_with_options, str(TICKERS_DIR / "nasdaq_options.txt"))
-    elif stock_exchange == 2 and scope == 1:
-        functions.write_tickers_to_file(tickers_with_options, str(TICKERS_DIR / "arca_options.txt"))
 
     # Combined call scan: covered calls (selling) + long calls (buying)
     if option_no == 5:

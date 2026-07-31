@@ -104,24 +104,15 @@ class Equity(Asset):
                 return {}
             price = float(trade[self._symbol].price)
 
-            # yfinance retained for options list and fundamentals only
+            # yfinance retained for options expiry list only
             stock = yf.Ticker(self._symbol)
             options = stock.options
             if not options:
                 return {}
 
-            info = stock.info
-            if not info or not isinstance(info, dict):
-                return {}
-
             return {
                 "price": price,
                 "options": options,
-                "sector": info.get("sector"),
-                "industry": info.get("industry"),
-                "beta": info.get("beta"),
-                "vol_aver_10days": info.get("averageDailyVolume10Day"),
-                "vol_aver_3months": info.get("averageDailyVolume3Month"),
             }
 
         except Exception:
