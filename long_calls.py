@@ -92,7 +92,7 @@ def scan_long_calls(
             "strike_price": round(float(row.strike), 2),
             "moneyness": moneyness,
             "sigma_distance": round(sigma_distance, 2),
-            "bid_per_share": round(float(ask), 2),
+            "ask_per_share": round(float(ask), 2),
             "premium_per_contract": round(float(ask * 100), 2),
             "spread_bid_ask": round(float(spread_bid_ask), 2),
             "break_even": break_even,

@@ -404,6 +404,7 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
     if buying_side:
         remove = {"max_profit", "max_profit_per_contract", "tot_return", "option_yield", "roc"}
         keys = [k for k in keys if k not in remove]
+        keys = ["ask_per_share" if k == "bid_per_share" else k for k in keys]
         keys = keys + ["profit_5pct", "return_5pct", "profit_10pct", "return_10pct"]
 
     data = []
