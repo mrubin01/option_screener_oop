@@ -42,10 +42,9 @@ Pinned packages: `alpaca-py==0.43.5`, `yfinance==0.2.59`, `curl-cffi==0.10.0`, `
 ALPACA_API_KEY=your_api_key_here
 ALPACA_SECRET_KEY=your_secret_key_here
 OUTPUT_DIR=/path/to/options-saas-refactored-phase1/shared/data
-BUYING_OUTPUT_DIR=~/options_buying_side
 ```
 
-`ALPACA_API_KEY` and `ALPACA_SECRET_KEY` are loaded at import time by `alpaca_client.py` via `python-dotenv`. `OUTPUT_DIR` and `BUYING_OUTPUT_DIR` are read by `main.py` at startup. The screener will raise `RuntimeError` on startup if any of the four are missing. `BUYING_OUTPUT_DIR` is created automatically if it does not exist.
+`ALPACA_API_KEY` and `ALPACA_SECRET_KEY` are loaded at import time by `alpaca_client.py` via `python-dotenv`. `OUTPUT_DIR` is read by `main.py` at startup. The screener will raise `RuntimeError` on startup if any of the three are missing.
 
 ## Architecture
 
@@ -96,7 +95,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 **Selling-side** JSON files are written to `OUTPUT_DIR`: `best_cov_calls_nyse.json`, `best_put_options_nasdaq.json`, etc. Sorted by `option_yield` descending.
 
-**Buying-side** JSON files are written to `BUYING_OUTPUT_DIR` (`~/options_buying_side`): `best_long_calls_nyse.json`, `best_long_puts_nasdaq.json`, etc. Sorted by `iv_hv_ratio` ascending (most underpriced first).
+**Buying-side** JSON files are also written to `OUTPUT_DIR`: `best_long_calls_nyse.json`, `best_long_puts_nasdaq.json`, etc. Sorted by `iv_hv_ratio` ascending (most underpriced first).
 
 Equity selling contracts have 33 fields; ETF selling contracts have 30 (no `sector`, `industry`, `beta`). Buying-side contracts drop `max_profit`, `max_profit_per_contract`, `tot_return`, `option_yield`, `roc` and add `profit_5pct`, `return_5pct`, `profit_10pct`, `return_10pct`. All contracts include `iv_hv_ratio`, `ex_dividend_date`, `earnings_date`.
 

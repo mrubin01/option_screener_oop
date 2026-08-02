@@ -22,11 +22,6 @@ if not _output_dir:
     raise RuntimeError("OUTPUT_DIR must be set in .env")
 OUTPUT_DIR = Path(_output_dir)
 
-_buying_output_dir = os.getenv("BUYING_OUTPUT_DIR")
-if not _buying_output_dir:
-    raise RuntimeError("BUYING_OUTPUT_DIR must be set in .env")
-BUYING_OUTPUT_DIR = Path(_buying_output_dir).expanduser()
-BUYING_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 warnings.simplefilter("ignore")
 pd.set_option("display.max_columns", None)
@@ -449,25 +444,25 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     if option_no == 5:
         if stock_exchange == 0:
             functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_nyse.json", 0, selling_sorted)
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nyse.json", 0, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_calls_nyse.json", 0, buying_sorted, buying_side=True)
         elif stock_exchange == 1:
             functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_nasdaq.json", 1, selling_sorted)
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, buying_sorted, buying_side=True)
         elif stock_exchange == 2:
             functions.write_best_options_to_json(OUTPUT_DIR / "best_cov_calls_arca.json", 2, selling_sorted)
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_arca.json", 2, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_calls_arca.json", 2, buying_sorted, buying_side=True)
 
     # Combined put scan: put options (selling) + long puts (buying)
     elif option_no == 6:
         if stock_exchange == 0:
             functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_nyse.json", 0, selling_sorted)
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nyse.json", 0, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_puts_nyse.json", 0, buying_sorted, buying_side=True)
         elif stock_exchange == 1:
             functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_nasdaq.json", 1, selling_sorted)
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, buying_sorted, buying_side=True)
         elif stock_exchange == 2:
             functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_arca.json", 2, selling_sorted)
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_arca.json", 2, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_puts_arca.json", 2, buying_sorted, buying_side=True)
 
     # Single modes (backward compat)
     elif option_no == 0:
@@ -486,18 +481,18 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             functions.write_best_options_to_json(OUTPUT_DIR / "best_put_options_arca.json", 2, selling_sorted)
     elif option_no == 3:
         if stock_exchange == 0:
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nyse.json", 0, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_calls_nyse.json", 0, buying_sorted, buying_side=True)
         elif stock_exchange == 1:
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_calls_nasdaq.json", 1, buying_sorted, buying_side=True)
         elif stock_exchange == 2:
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_calls_arca.json", 2, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_calls_arca.json", 2, buying_sorted, buying_side=True)
     elif option_no == 4:
         if stock_exchange == 0:
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nyse.json", 0, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_puts_nyse.json", 0, buying_sorted, buying_side=True)
         elif stock_exchange == 1:
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_puts_nasdaq.json", 1, buying_sorted, buying_side=True)
         elif stock_exchange == 2:
-            functions.write_best_options_to_json(BUYING_OUTPUT_DIR / "best_long_puts_arca.json", 2, buying_sorted, buying_side=True)
+            functions.write_best_options_to_json(OUTPUT_DIR / "best_long_puts_arca.json", 2, buying_sorted, buying_side=True)
 
     end_time = time.time()
     execution_time = end_time - start_time
