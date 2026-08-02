@@ -22,11 +22,14 @@ def scan_long_puts(
     sector: str | None = None,
     industry: str | None = None,
     beta: float | None = None,
+    df=None,
+    ex_dividend_date: str | None = None,
+    earnings_date: str | None = None,
 ) -> list[dict[str, Any]]:
 
     matched_contracts = []
 
-    puts = functions.get_alpaca_option_chain(symbol, option_date, "put")
+    puts = df if df is not None else functions.get_alpaca_option_chain(symbol, option_date, "put")
     if puts is None or puts.empty:
         return []
 
@@ -64,13 +67,18 @@ def scan_long_puts(
         max_profit_per_share = round(float(row.strike) - ask, 2)
 
         est_delta = functions.estimate_delta("put", current_price, row.strike, dte, config.RISK_FREE_RATE, row.impliedVolatility)
+        if float(est_delta) < config.LONG_MIN_DELTA:
+            continue
 
-        option_yield = round((ask / float(row.strike)) * 100, 2)
-        annualized_option_yield = round(option_yield * (365 / dte), 2)
         tot_return = round(((float(row.strike) - ask) / current_price) * 100, 2)
         sigma_distance = functions.sigma_distance_to_strike(
             current_price, float(row.strike), float(row.impliedVolatility), dte
         )
+
+        profit_5pct = round(float(row.strike) * 0.05 - ask, 2)
+        return_5pct = round((profit_5pct / ask) * 100, 2) if ask > 0 else 0.0
+        profit_10pct = round(float(row.strike) * 0.10 - ask, 2)
+        return_10pct = round((profit_10pct / ask) * 100, 2) if ask > 0 else 0.0
 
         contract = {
             "ticker": ticker.symbol,
@@ -92,15 +100,19 @@ def scan_long_puts(
             "break_even": break_even,
             "open_interest": int(row.openInterest) if row.openInterest is not None and not (isinstance(row.openInterest, float) and math.isnan(row.openInterest)) else 0,
             "impl_volatility": round(float(row.impliedVolatility * 100), 2),
-            "option_yield": option_yield,
-            "roc": annualized_option_yield,
             "tot_return": tot_return,
+            "profit_5pct": profit_5pct,
+            "return_5pct": return_5pct,
+            "profit_10pct": profit_10pct,
+            "return_10pct": return_10pct,
             "delta": est_delta,
             "highest_price": highest_price,
             "avg_price": avg_price,
             "lowest_price": lowest_price,
             "main_trend": main_trend,
             "iv_hv_ratio": iv_hv_ratio,
+            "ex_dividend_date": ex_dividend_date,
+            "earnings_date": earnings_date,
         }
 
         if exchange in [0, 1]:

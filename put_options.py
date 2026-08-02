@@ -23,6 +23,9 @@ def scan_put_options(
     industry: str | None = None,
     beta: float | None = None,
     hv: float = 0.0,
+    df=None,
+    ex_dividend_date: str | None = None,
+    earnings_date: str | None = None,
 ) -> list[dict[str, Any]]:
 
     matched_contracts = []
@@ -30,11 +33,13 @@ def scan_put_options(
     if threshold_bid < 0:
         raise ValueError("threshold_bid must be non-negative")
 
-    puts = functions.get_alpaca_option_chain(symbol, option_date, "put")
+    puts = df if df is not None else functions.get_alpaca_option_chain(symbol, option_date, "put")
     if puts is None or puts.empty:
         return []
 
     main_trend = functions.compute_main_trend(current_price, avg_price, avg_price_7d, avg_price_30d, trend)
+    if main_trend < 0:
+        return []
     dte = functions.days_to_expiration(option_date)
     if dte <= 0:
         return []
@@ -44,6 +49,9 @@ def scan_put_options(
             continue
 
         if row.bid < threshold_bid or row.strike >= current_price:
+            continue
+
+        if row.openInterest > 0 and row.openInterest < config.SELL_MIN_OPEN_INTEREST:
             continue
 
         spread_bid_ask = round(row.ask - row.bid, 2)
@@ -68,6 +76,8 @@ def scan_put_options(
             continue
 
         iv_hv_ratio = round(row.impliedVolatility / hv, 2) if hv > 0 else None
+        if iv_hv_ratio is not None and iv_hv_ratio < config.SELL_MIN_IV_HV_RATIO:
+            continue
 
         annualized_option_yield = round(option_yield * (365 / dte), 2)
         tot_return = round((row.bid / current_price) * 100, 2)
@@ -105,6 +115,8 @@ def scan_put_options(
             "lowest_price": lowest_price,
             "main_trend": main_trend,
             "iv_hv_ratio": iv_hv_ratio,
+            "ex_dividend_date": ex_dividend_date,
+            "earnings_date": earnings_date,
         }
 
         if exchange in [0, 1]:

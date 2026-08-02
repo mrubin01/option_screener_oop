@@ -66,7 +66,7 @@ class Asset(object):
             avg_price_30d = round(float(close_prices.tail(30).mean()), 2)
             last_price = round(float(close_prices.iloc[-1]), 2)
             first_price = round(float(close_prices.iloc[0]), 2)
-            price_trend = functions.get_price_trend(close_prices)
+            price_trend = functions.get_price_trend(close_prices.tail(30))
             abs_sd, rel_sd = functions.get_std_dev(self._symbol, close_prices)
             hv = functions.compute_hv(close_prices)
 

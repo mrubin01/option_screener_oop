@@ -19,8 +19,8 @@ SCOPE = 0  # 0 only tickers with options, 1 whole ticker list
 OPTION_TYPE = ["Call", "Put", "Spread", "Long Call", "Long Put", "Combined Call", "Combined Put"]
 EXCHANGES = ["NYSE", "NASDAQ", "ARCA"]
 
-RISK_FREE_RATE = 3.86  # 1-month Treasury rate
-OPTION_YIELD_THRESHOLD = 25
+RISK_FREE_RATE = 3.686  # 1-month Treasury rate
+OPTION_YIELD_THRESHOLD = 15
 
 # Exchange-specific thresholds (computed inside main() from exchange_number)
 NYSE_NASDAQ_MAX_STOCK_PRICE = 50
@@ -32,13 +32,18 @@ ARCA_MIN_BID_PRICE = 0.5
 SPREAD_MIN_EXPIRY_DATES = 10
 SPREAD_MIN_ITM_DISTANCE = 6
 
+# Selling-side filters
+SELL_MIN_OPEN_INTEREST = 50
+SELL_MIN_IV_HV_RATIO = 1.0
+
 # Buying-side filters
 LONG_TARGET_DATES = [d.strftime("%Y-%m-%d") for d in _next_n_fridays(4)[2:]]
-LONG_MAX_MONEYNESS = 10.0
+LONG_MAX_MONEYNESS = 5.0
 LONG_MAX_IV_HV_RATIO = 1.0
 LONG_MIN_OPEN_INTEREST = 50
-LONG_MIN_ASK = 0.20
-LONG_MAX_ASK = 2.00
+LONG_MIN_ASK = 0
+LONG_MAX_ASK = 1.00
+LONG_MIN_DELTA = 30
 
 if __name__ == "__main__":
     raise RuntimeError("This module is not meant to be run directly")

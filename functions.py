@@ -300,12 +300,12 @@ def compute_main_trend(
     avg_price_30d: float,
     trend: int,
 ) -> int:
-    below_all = current_price < avg_price and current_price < avg_price_7d and current_price < avg_price_30d
-    above_all = current_price > avg_price and current_price > avg_price_7d and current_price > avg_price_30d
+    below_recent = current_price < avg_price_7d and current_price < avg_price_30d
+    above_recent = current_price > avg_price_7d and current_price > avg_price_30d
 
-    if above_all and trend == 1:
+    if above_recent and trend == 1:
         return 1   # TREND_UP
-    if below_all and trend == 0:
+    if below_recent and trend == 0:
         return -1  # TREND_DOWN
     return 0       # TREND_SIDEWAYS
 
@@ -328,7 +328,7 @@ def write_tickers_to_file(tickers: list, filename: str):
         print(f"Failed to write file: {e}")
 
 
-def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: list[dict]):
+def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: list[dict], buying_side: bool = False):
     if exchange_no in [0, 1]:
         keys = [
             "ticker",
@@ -362,6 +362,8 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "main_trend",
             "beta",
             "iv_hv_ratio",
+            "ex_dividend_date",
+            "earnings_date",
         ]
     elif exchange_no == 2:
         keys = [
@@ -393,13 +395,20 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "lowest_price",
             "main_trend",
             "iv_hv_ratio",
+            "ex_dividend_date",
+            "earnings_date",
         ]
     else:
         raise ValueError("Wrong exchange number!")
 
+    if buying_side:
+        remove = {"max_profit", "max_profit_per_contract", "tot_return", "option_yield", "roc"}
+        keys = [k for k in keys if k not in remove]
+        keys = keys + ["profit_5pct", "return_5pct", "profit_10pct", "return_10pct"]
+
     data = []
     for row in sorted_option_list:
-        item = {key: row[key] for key in keys}
+        item = {key: row.get(key) for key in keys}
         # item["expiry_date"] = row["strike_date"]
         data.append(item)
 
