@@ -67,12 +67,12 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 6. Matched contracts are collected in two separate lists, sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to two JSON files per scan via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
-- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 6 combined scans. `OPTION_TYPE` list has indices 0–6; indices 5 ("Combined Call") and 6 ("Combined Put") are used by `SCANS`. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`, `STRIKE_PRICE_THRESHOLD`) are read inside `main()` from the actual exchange argument. Buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
+- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 6 combined scans. `OPTION_TYPE` list has indices 0–6; indices 5 ("Combined Call") and 6 ("Combined Put") are used by `SCANS`. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`) are read inside `main()` from the actual exchange argument. Selling-side filters (`SELL_MIN_MONEYNESS`, `SELL_MIN_OPEN_INTEREST`, `SELL_MIN_IV_HV_RATIO`) and buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`, `LONG_MIN_DELTA`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
 - `alpaca_client.py` — initializes `StockHistoricalDataClient`, `OptionHistoricalDataClient`, and `TradingClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and four rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`, `get_option_contracts`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest` (90-day window); computes HV (annualised historical volatility from 90-day log returns) and `price_trend` (linear regression slope over the **last 30 bars** only) in `get_price_stats()`; options expiry list via yfinance only (all fundamentals now come from the CSV files, not yfinance)
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame, fetches open interest via `TradingClient.get_option_contracts`), `compute_hv`, `compute_main_trend` (uses 7d and 30d averages only — 90d dropped to match near-term option DTE), `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
-- `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`; trend filter skips uptrend stocks (`main_trend > 0`); includes `iv_hv_ratio`, `ex_dividend_date`, `earnings_date` per contract
-- `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern; trend filter skips downtrend stocks (`main_trend < 0`); includes `iv_hv_ratio`, `ex_dividend_date`, `earnings_date` per contract
+- `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`; trend filter skips uptrend stocks (`main_trend > 0`); moneyness filter requires strike ≥ 5% OTM (`SELL_MIN_MONEYNESS`); includes `iv_hv_ratio`, `ex_dividend_date`, `earnings_date` per contract
+- `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern; trend filter skips downtrend stocks (`main_trend < 0`); moneyness filter requires strike ≥ 5% OTM (`SELL_MIN_MONEYNESS`); includes `iv_hv_ratio`, `ex_dividend_date`, `earnings_date` per contract
 - `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` (alias of `scan_covered_calls` from covered_calls)
 - `long_calls.py` — `scan_long_calls` for buying-side call scans; filters: uptrend or sideways, OTM 0–5%, ask ≤ $1.00, OI ≥ 50 (when available), iv_hv_ratio ≤ 1.0, delta ≥ 30%; includes scenario profit fields and `ex_dividend_date`, `earnings_date`
 - `long_puts.py` — `scan_long_puts` for buying-side put scans; filters: downtrend or sideways, OTM 0–5%, ask ≤ $1.00, OI ≥ 50 (when available), iv_hv_ratio ≤ 1.0, delta ≥ 30%; includes scenario profit fields and `ex_dividend_date`, `earnings_date`
@@ -160,15 +160,44 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 | `ARCA_MAX_STOCK_PRICE` | default 200 | Price ceiling for ARCA tickers |
 | `NYSE_NASDAQ_MIN_BID_PRICE` | default 0.2 | Minimum bid for NYSE/NASDAQ contracts |
 | `ARCA_MIN_BID_PRICE` | default 0.5 | Minimum bid for ARCA contracts |
+| `SELL_MIN_MONEYNESS` | default 5.0 | Min % OTM for selling contracts — strike must be at least 5% away from current price |
 | `SELL_MIN_OPEN_INTEREST` | default 50 | Min OI for selling contracts (only when OI > 0) |
 | `SELL_MIN_IV_HV_RATIO` | default 1.0 | Min IV/HV for selling — only sell when options are expensive relative to realised vol |
 | `LONG_TARGET_DATES` | auto-computed | 3rd and 4th Fridays from today; used for buying scans |
-| `LONG_MAX_MONEYNESS` | default 5 | Max % OTM for long call/put contracts |
+| `LONG_MAX_MONEYNESS` | default 5.0 | Max % OTM for long call/put contracts — strike must be within 5% of current price |
 | `LONG_MAX_IV_HV_RATIO` | default 1.0 | Max IV/HV ratio — only buy when options are at or below realised vol |
 | `LONG_MIN_OPEN_INTEREST` | default 50 | Min open interest (only applied when OI data is available) |
 | `LONG_MIN_ASK` | default 0 | Min ask price for long contracts |
 | `LONG_MAX_ASK` | default 1.00 | Max ask price for long contracts |
 | `LONG_MIN_DELTA` | default 30 | Min delta (%) for long contracts — favours higher probability of assignment |
+
+## Scan filters
+
+Filters applied at two levels for each scan type. "OI" = open interest; when OI data is missing (0) the OI filter is skipped.
+
+### Ticker-level (applied before fetching the option chain)
+
+| Filter | Covered Calls | Put Options | Long Calls | Long Puts |
+|---|---|---|---|---|
+| Max stock price | ≤ $50 NYSE/NASDAQ, ≤ $200 ARCA | same | same | same |
+| CoV (rel std dev) | ≤ 15 | ≤ 15 | not applied | not applied |
+| Trend | flat or downtrend | flat or uptrend | flat or uptrend | flat or downtrend |
+| Earnings within DTE | blocked | blocked | blocked | blocked |
+| Ex-div within DTE | blocked | blocked | blocked | **not blocked** |
+| Expiry dates | next 3 Fridays | next 3 Fridays | 3rd & 4th Fridays | 3rd & 4th Fridays |
+
+### Contract-level (applied per row in the option chain)
+
+| Filter | Covered Calls | Put Options | Long Calls | Long Puts |
+|---|---|---|---|---|
+| Strike direction | strike > price (OTM) | strike < price (OTM) | strike > price (OTM) | strike < price (OTM) |
+| Moneyness | ≥ 5% OTM | ≥ 5% OTM | ≤ 5% OTM | ≤ 5% OTM |
+| Min bid / ask | bid ≥ $0.20 NYSE/NASDAQ, ≥ $0.50 ARCA | same | ask ≥ $0 | ask ≥ $0 |
+| Max ask | — | — | ask ≤ $1.00 | ask ≤ $1.00 |
+| Open interest | OI ≥ 50 (when OI > 0) | same | same | same |
+| IV/HV ratio | ≥ 1.0 (sell when expensive) | same | ≤ 1.0 (buy when cheap) | same |
+| Option yield | < 15% | < 15% | — | — |
+| Delta | — | — | ≥ 30% | ≥ 30% |
 
 ## Known issues
 

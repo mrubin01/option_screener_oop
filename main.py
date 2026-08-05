@@ -101,11 +101,9 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     if stock_exchange in [0, 1]:
         max_stock_price = config.NYSE_NASDAQ_MAX_STOCK_PRICE
         min_bid_price = config.NYSE_NASDAQ_MIN_BID_PRICE
-        config.STRIKE_PRICE_THRESHOLD = 1.5
     else:
         max_stock_price = config.ARCA_MAX_STOCK_PRICE
         min_bid_price = config.ARCA_MIN_BID_PRICE
-        config.STRIKE_PRICE_THRESHOLD = 3
 
     print("|--------------------------------------------------------------------------|")
 

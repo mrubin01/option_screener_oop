@@ -13,7 +13,6 @@ TARGET_DATES = [d.strftime("%Y-%m-%d") for d in _next_n_fridays(3)]
 # global variables
 TYPE = 0  # 0 call, 1 put, 2 spread
 STD_DEV_THRESHOLD = 15
-STRIKE_PRICE_THRESHOLD = 1.5  # overridden inside main() per exchange
 SCOPE = 0  # 0 only tickers with options, 1 whole ticker list
 
 OPTION_TYPE = ["Call", "Put", "Spread", "Long Call", "Long Put", "Combined Call", "Combined Put"]
@@ -35,6 +34,7 @@ SPREAD_MIN_ITM_DISTANCE = 6
 # Selling-side filters
 SELL_MIN_OPEN_INTEREST = 50
 SELL_MIN_IV_HV_RATIO = 1.0
+SELL_MIN_MONEYNESS = 5.0
 
 # Buying-side filters
 LONG_TARGET_DATES = [d.strftime("%Y-%m-%d") for d in _next_n_fridays(4)[2:]]

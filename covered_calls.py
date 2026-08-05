@@ -62,8 +62,8 @@ def scan_covered_calls(
         if isinstance(spread_bid_ask, float) and math.isnan(spread_bid_ask):
             continue
 
-        if (isinstance(spread_strike_price, float) and math.isnan(spread_strike_price)) or \
-                spread_strike_price <= config.STRIKE_PRICE_THRESHOLD:
+        moneyness = round(((float(row.strike) - current_price) / current_price) * 100, 2)
+        if moneyness < config.SELL_MIN_MONEYNESS:
             continue
 
         if isinstance(delta_price_premium, float) and math.isnan(delta_price_premium):
@@ -81,7 +81,6 @@ def scan_covered_calls(
 
         annualized_option_yield = round(option_yield * (365 / dte), 2)
         tot_return = round(((row.strike - current_price + row.bid) / current_price) * 100, 2)
-        moneyness = round(((float(row.strike) - current_price) / current_price) * 100, 2)
         sigma_distance = functions.sigma_distance_to_strike(
             current_price, float(row.strike), float(row.impliedVolatility), dte
         )
