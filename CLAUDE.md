@@ -161,12 +161,12 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 | `NYSE_NASDAQ_MIN_BID_PRICE` | default 0.2 | Minimum bid for NYSE/NASDAQ contracts |
 | `ARCA_MIN_BID_PRICE` | default 0.5 | Minimum bid for ARCA contracts |
 | `SELL_MIN_MONEYNESS` | default 5.0 | Min % OTM for selling contracts — strike must be at least 5% away from current price |
-| `SELL_MIN_OPEN_INTEREST` | default 50 | Min OI for selling contracts (only when OI > 0) |
+| `SELL_MIN_OPEN_INTEREST` | default 50 | Min OI for selling contracts; OI = 0 and missing OI are also rejected |
 | `SELL_MIN_IV_HV_RATIO` | default 1.0 | Min IV/HV for selling — only sell when options are expensive relative to realised vol |
 | `LONG_TARGET_DATES` | auto-computed | 3rd and 4th Fridays from today; used for buying scans |
 | `LONG_MAX_MONEYNESS` | default 5.0 | Max % OTM for long call/put contracts — strike must be within 5% of current price |
 | `LONG_MAX_IV_HV_RATIO` | default 1.0 | Max IV/HV ratio — only buy when options are at or below realised vol |
-| `LONG_MIN_OPEN_INTEREST` | default 50 | Min open interest (only applied when OI data is available) |
+| `LONG_MIN_OPEN_INTEREST` | default 50 | Min open interest; OI = 0 and missing OI are also rejected |
 | `LONG_MIN_ASK` | default 0 | Min ask price for long contracts |
 | `LONG_MAX_ASK` | default 1.00 | Max ask price for long contracts |
 | `LONG_MIN_DELTA` | default 30 | Min delta (%) for long contracts — favours higher probability of assignment |
@@ -194,7 +194,7 @@ Filters applied at two levels for each scan type. "OI" = open interest; when OI 
 | Moneyness | ≥ 5% OTM | ≥ 5% OTM | ≤ 5% OTM | ≤ 5% OTM |
 | Min bid / ask | bid ≥ $0.20 NYSE/NASDAQ, ≥ $0.50 ARCA | same | ask ≥ $0 | ask ≥ $0 |
 | Max ask | — | — | ask ≤ $1.00 | ask ≤ $1.00 |
-| Open interest | OI ≥ 50 (when OI > 0) | same | same | same |
+| Open interest | OI ≥ 50 (OI = 0 also rejected) | same | same | same |
 | IV/HV ratio | ≥ 1.0 (sell when expensive) | same | ≤ 1.0 (buy when cheap) | same |
 | Option yield | < 15% | < 15% | — | — |
 | Delta | — | — | ≥ 30% | ≥ 30% |

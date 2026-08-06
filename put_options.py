@@ -51,7 +51,7 @@ def scan_put_options(
         if row.bid < threshold_bid or row.strike >= current_price:
             continue
 
-        if row.openInterest > 0 and row.openInterest < config.SELL_MIN_OPEN_INTEREST:
+        if row.openInterest is None or (isinstance(row.openInterest, float) and math.isnan(row.openInterest)) or row.openInterest < config.SELL_MIN_OPEN_INTEREST:
             continue
 
         spread_bid_ask = round(row.ask - row.bid, 2)
