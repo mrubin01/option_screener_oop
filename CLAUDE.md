@@ -62,6 +62,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
 3. It calls `.get_info()` / `.get_info_etf()` (Alpaca price + yfinance options expiry list) and `.get_price_stats()` — both return dicts or `{}` on failure
 4. Pre-filters: price > exchange threshold and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker for selling (buying proceeds regardless of CoV)
+4a. Date normalisation: `ex_dividend_date` and `earnings_date` from the CSV are set to `None` in `main.py` if the date is already in the past — so only future dates reach the per-date gate and the output JSON
 5. In combined mode (the default), both selling scan (`scan_covered_calls` or `scan_put_options`) and buying scan (`scan_long_calls` or `scan_long_puts`) run for the same ticker in one pass — selling dates use `config.TARGET_DATES` (next 3 Fridays), buying dates use `config.LONG_TARGET_DATES` (3rd and 4th Fridays)
 5a. Per-date gate in the combined loop: selling is also blocked when earnings or ex-dividend date falls within DTE; buying is blocked when earnings fall within DTE; long calls are additionally blocked when ex-dividend falls within DTE (ex-div drops the stock price, hurting calls); long puts are NOT blocked on ex-div (the drop helps puts)
 6. Matched contracts are collected in two separate lists, sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to two JSON files per scan via `functions.write_best_options_to_json()`
@@ -89,7 +90,7 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 - **break_even** — selling calls: `price - bid`; selling puts: `strike - bid`; long calls: `strike + ask`; long puts: `strike - ask`
 - **profit_5pct / return_5pct** — buying side only: `profit = strike × 0.05 − ask`; `return = (profit / ask) × 100`; models a 5% move beyond the strike
 - **profit_10pct / return_10pct** — buying side only: same formula with 10%
-- **earnings_date / ex_dividend_date** — ISO date strings from the CSV; `null` when not available; used as per-date filters in the combined loop and included as metadata in all output contracts
+- **earnings_date / ex_dividend_date** — ISO date strings from the CSV; `null` when not available or already in the past; used as per-date filters in the combined loop and included as metadata in all output contracts
 
 ## Output
 
@@ -152,7 +153,6 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 |---|---|---|
 | `TYPE` | 0=call, 1=put | No longer edited — full run cycles all types |
 | `TARGET_DATES` | auto-computed | Next 3 Fridays from today; no manual edit needed |
-| `SCOPE` | 0=tickers with options only, 1=full list | Input ticker file |
 | `RISK_FREE_RATE` | float (%) | 1-month Treasury rate used for delta calculation |
 | `STD_DEV_THRESHOLD` | default 15 | Tickers with CoV above this are skipped |
 | `OPTION_YIELD_THRESHOLD` | default 15 | Contracts with yield above this are skipped (unrealistic); not applied on buying side |
