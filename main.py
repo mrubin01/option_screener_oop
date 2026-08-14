@@ -144,6 +144,17 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             beta = fund.get("beta")
             ex_dividend_date = fund.get("ex_dividend_date")
             earnings_date = fund.get("earnings_date")
+            _today = _date.today()
+            if ex_dividend_date:
+                try:
+                    ex_dividend_date = ex_dividend_date if _date.fromisoformat(ex_dividend_date) >= _today else None
+                except ValueError:
+                    ex_dividend_date = None
+            if earnings_date:
+                try:
+                    earnings_date = earnings_date if _date.fromisoformat(earnings_date) >= _today else None
+                except ValueError:
+                    earnings_date = None
 
             if price > max_stock_price:
                 return [], []
@@ -300,6 +311,17 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             fund = ticker_fundamentals.get(t, {})
             ex_dividend_date = fund.get("ex_dividend_date")
             earnings_date = fund.get("earnings_date")
+            _today = _date.today()
+            if ex_dividend_date:
+                try:
+                    ex_dividend_date = ex_dividend_date if _date.fromisoformat(ex_dividend_date) >= _today else None
+                except ValueError:
+                    ex_dividend_date = None
+            if earnings_date:
+                try:
+                    earnings_date = earnings_date if _date.fromisoformat(earnings_date) >= _today else None
+                except ValueError:
+                    earnings_date = None
 
             if price > max_stock_price:
                 return [], []
