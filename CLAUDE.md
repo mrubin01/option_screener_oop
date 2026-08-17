@@ -156,7 +156,7 @@ yfinance is pinned at `0.2.59` to avoid breakage from undocumented API changes.
 | `RISK_FREE_RATE` | float (%) | 1-month Treasury rate used for delta calculation |
 | `STD_DEV_THRESHOLD` | default 15 | Tickers with CoV above this are skipped |
 | `OPTION_YIELD_THRESHOLD` | default 15 | Contracts with yield above this are skipped (unrealistic); not applied on buying side |
-| `NYSE_NASDAQ_MAX_STOCK_PRICE` | default 50 | Price ceiling for NYSE/NASDAQ tickers |
+| `NYSE_NASDAQ_MAX_STOCK_PRICE` | default 100 | Price ceiling for NYSE/NASDAQ tickers |
 | `ARCA_MAX_STOCK_PRICE` | default 200 | Price ceiling for ARCA tickers |
 | `NYSE_NASDAQ_MIN_BID_PRICE` | default 0.2 | Minimum bid for NYSE/NASDAQ contracts |
 | `ARCA_MIN_BID_PRICE` | default 0.5 | Minimum bid for ARCA contracts |
@@ -179,7 +179,7 @@ Filters applied at two levels for each scan type. "OI" = open interest; when OI 
 
 | Filter | Covered Calls | Put Options | Long Calls | Long Puts |
 |---|---|---|---|---|
-| Max stock price | ≤ $50 NYSE/NASDAQ, ≤ $200 ARCA | same | same | same |
+| Max stock price | ≤ $100 NYSE/NASDAQ, ≤ $200 ARCA | same | same | same |
 | CoV (rel std dev) | ≤ 15 | ≤ 15 | not applied | not applied |
 | Trend | flat or downtrend | flat or uptrend | flat or uptrend | flat or downtrend |
 | Earnings within DTE | blocked | blocked | blocked | blocked |

@@ -22,7 +22,7 @@ RISK_FREE_RATE = 3.686  # 1-month Treasury rate
 OPTION_YIELD_THRESHOLD = 15
 
 # Exchange-specific thresholds (computed inside main() from exchange_number)
-NYSE_NASDAQ_MAX_STOCK_PRICE = 50
+NYSE_NASDAQ_MAX_STOCK_PRICE = 100
 ARCA_MAX_STOCK_PRICE = 200
 NYSE_NASDAQ_MIN_BID_PRICE = 0.2
 ARCA_MIN_BID_PRICE = 0.5
