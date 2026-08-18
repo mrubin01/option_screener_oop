@@ -38,7 +38,7 @@ def scan_covered_calls(
         return []
 
     main_trend = functions.compute_main_trend(current_price, avg_price, avg_price_7d, avg_price_30d, trend)
-    if main_trend > 0:
+    if main_trend < 0:
         return []
     dte = functions.days_to_expiration(option_date)
     if dte <= 0:
