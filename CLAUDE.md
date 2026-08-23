@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Running the screener
 
 ```bash
-# Run all 6 scans unattended
+# Run all 3 scans unattended
 python main.py
 ```
 
@@ -63,12 +63,12 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 3. It calls `.get_info()` / `.get_info_etf()` (Alpaca price + yfinance options expiry list) and `.get_price_stats()` — both return dicts or `{}` on failure
 4. Pre-filters: price > exchange threshold and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker for selling (buying proceeds regardless of CoV)
 4a. Date normalisation: `ex_dividend_date` and `earnings_date` from the CSV are set to `None` in `main.py` if the date is already in the past — so only future dates reach the per-date gate and the output JSON
-5. In combined mode (the default), both selling scan (`scan_covered_calls` or `scan_put_options`) and buying scan (`scan_long_calls` or `scan_long_puts`) run for the same ticker in one pass — selling dates use `config.TARGET_DATES` (next 3 Fridays), buying dates use `config.LONG_TARGET_DATES` (3rd and 4th Fridays)
+5. In type 7 (Combined All) mode, all four strategies run for the same ticker in one pass — selling dates use `config.TARGET_DATES` (next 3 Fridays), buying dates use `config.LONG_TARGET_DATES` (3rd and 4th Fridays); calls and puts share the same chain fetch when the date qualifies for both
 5a. Per-date gate in the combined loop: selling is also blocked when earnings or ex-dividend date falls within DTE; buying is blocked when earnings fall within DTE; long calls are additionally blocked when ex-dividend falls within DTE (ex-div drops the stock price, hurting calls); long puts are NOT blocked on ex-div (the drop helps puts)
-6. Matched contracts are collected in two separate lists, sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to two JSON files per scan via `functions.write_best_options_to_json()`
+6. Matched contracts are collected in four separate lists (covered calls, long calls, put options, long puts), sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to four JSON files per scan via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
-- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 6 combined scans. `OPTION_TYPE` list has indices 0–7; index 7 ("Combined All") is used by `SCANS` and runs all four strategies (covered calls, long calls, put options, long puts) in a single ticker pass. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`) are read inside `main()` from the actual exchange argument. Selling-side filters (`SELL_MIN_MONEYNESS`, `SELL_MIN_OPEN_INTEREST`, `SELL_MIN_IV_HV_RATIO`) and buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`, `LONG_MIN_DELTA`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
+- `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 3 scans using type 7. `OPTION_TYPE` list has indices 0–7; index 7 ("Combined All") is used by `SCANS` and runs all four strategies (covered calls, long calls, put options, long puts) in a single ticker pass. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`) are read inside `main()` from the actual exchange argument. Selling-side filters (`SELL_MIN_MONEYNESS`, `SELL_MIN_OPEN_INTEREST`, `SELL_MIN_IV_HV_RATIO`) and buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`, `LONG_MIN_DELTA`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
 - `alpaca_client.py` — initializes `StockHistoricalDataClient`, `OptionHistoricalDataClient`, and `TradingClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and four rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`, `get_option_contracts`) used by `Assets.py` and `functions.py`
 - `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest` (90-day window); computes HV (annualised historical volatility from 90-day log returns) and `price_trend` (linear regression slope over the **last 30 bars** only) in `get_price_stats()`; options expiry list via yfinance only (all fundamentals now come from the CSV files, not yfinance)
 - `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame, fetches open interest via `TradingClient.get_option_contracts`), `compute_hv`, `compute_main_trend` (uses 7d and 30d averages only — 90d dropped to match near-term option DTE), `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
@@ -126,9 +126,9 @@ The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in 
 - `alpaca_client.get_option_chain(req)` — used by `functions.get_alpaca_option_chain()`
 - `alpaca_client.get_option_contracts(req)` — used by `functions.get_alpaca_option_chain()` to fetch open interest per contract via `TradingClient`
 
-**Parallelism** — `main.py` extracts per-ticker logic into `_process_equity_ticker()` and `_process_etf_ticker()`, then maps them over `ticker_list` with `ThreadPoolExecutor(max_workers=8)`. The rate limiter is the throughput ceiling; adding more workers beyond ~8 yields no benefit.
+**Parallelism** — `main.py` extracts per-ticker logic into `_process_equity_ticker_combined()` and `_process_etf_ticker_combined()` (type 7 — all 4 strategies per ticker), plus legacy `_process_equity_ticker()` / `_process_etf_ticker()` for backward-compat single modes. Type 7 uses `ThreadPoolExecutor(max_workers=12)`; legacy paths use `max_workers=8`. The rate limiter is the throughput ceiling.
 
-**Prints** — per-ticker status prints (`Scanning stock…`, `Match!`) and the market index/VIX header block were removed. Each scan prints a scan header (e.g. `Scan 3/9: Spread — ARCA`) and footer (contract count, execution time). The full run prints a total elapsed time at the end.
+**Prints** — per-ticker status prints (`Scanning stock…`, `Match!`) and the market index/VIX header block were removed. Each scan prints a scan header (e.g. `Scan 1/3: Combined All — NYSE`) and footer (contract counts for all 4 strategies, execution time). The full run prints a total elapsed time at the end.
 
 ## Data sources
 
