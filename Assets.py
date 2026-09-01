@@ -1,3 +1,4 @@
+import concurrent.futures
 import yfinance as yf
 import pandas as pd
 import functions
@@ -5,6 +6,13 @@ import alpaca_client
 from alpaca.data.requests import StockLatestTradeRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from datetime import datetime, timedelta
+
+_YF_TIMEOUT = 15  # seconds for any yfinance network call
+
+
+def _yf_call(fn, timeout=_YF_TIMEOUT):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(fn).result(timeout=timeout)
 
 
 class Asset(object):
@@ -49,21 +57,25 @@ class Asset(object):
             if self._symbol not in bars.data or not bars.data[self._symbol]:
                 return {}
 
+            bar_data = bars.data[self._symbol]
             close_prices = pd.Series(
-                [b.close for b in bars.data[self._symbol]],
-                index=[b.timestamp.date() for b in bars.data[self._symbol]],
+                [b.close for b in bar_data],
+                index=[b.timestamp.date() for b in bar_data],
                 dtype=float,
-            )
-
-            close_prices = close_prices.dropna()
+            ).dropna()
             if close_prices.empty:
                 return {}
 
-            low = round(float(close_prices.min()), 2)
-            high = round(float(close_prices.max()), 2)
+            high_prices = pd.Series([b.high for b in bar_data], dtype=float)
+            low_prices = pd.Series([b.low for b in bar_data], dtype=float)
+
             avg_price = round(float(close_prices.mean()), 2)
             avg_price_7d = round(float(close_prices.tail(7).mean()), 2)
             avg_price_30d = round(float(close_prices.tail(30).mean()), 2)
+            ma_20 = round(float(close_prices.tail(20).mean()), 2)
+            ma_50 = round(float(close_prices.tail(50).mean()), 2)
+            high_90d = round(float(high_prices.max()), 2)
+            low_90d = round(float(low_prices.min()), 2)
             last_price = round(float(close_prices.iloc[-1]), 2)
             first_price = round(float(close_prices.iloc[0]), 2)
             price_trend = functions.get_price_trend(close_prices.tail(30))
@@ -71,8 +83,10 @@ class Asset(object):
             hv = functions.compute_hv(close_prices)
 
             return {
-                "low": low,
-                "high": high,
+                "ma_20": ma_20,
+                "ma_50": ma_50,
+                "high_90d": high_90d,
+                "low_90d": low_90d,
                 "first_price": first_price,
                 "last_price": last_price,
                 "avg_price": avg_price,
@@ -104,9 +118,8 @@ class Equity(Asset):
                 return {}
             price = float(trade[self._symbol].price)
 
-            # yfinance retained for options expiry list only
             stock = yf.Ticker(self._symbol)
-            options = stock.options
+            options = _yf_call(lambda: stock.options)
             if not options:
                 return {}
 
@@ -134,9 +147,8 @@ class ETF(Asset):
                 return {}
             price = float(trade[self._symbol].price)
 
-            # yfinance retained for options list only; no .info call needed for ETFs
             stock = yf.Ticker(self._symbol)
-            options = stock.options
+            options = _yf_call(lambda: stock.options)
             if not options:
                 return {}
 

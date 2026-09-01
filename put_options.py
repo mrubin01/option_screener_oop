@@ -12,9 +12,11 @@ def scan_put_options(
     threshold_bid: float,
     symbol: str,
     current_price: float,
-    lowest_price: float,
-    highest_price: float,
+    high_90d: float,
+    low_90d: float,
     avg_price: float,
+    ma_20: float,
+    ma_50: float,
     avg_price_7d: float,
     avg_price_30d: float,
     trend: int,
@@ -80,7 +82,7 @@ def scan_put_options(
             continue
 
         annualized_option_yield = round(option_yield * (365 / dte), 2)
-        tot_return = round((row.bid / current_price) * 100, 2)
+        tot_return = option_yield
         sigma_distance = functions.sigma_distance_to_strike(
             current_price, float(row.strike), float(row.impliedVolatility), dte
         )
@@ -109,9 +111,10 @@ def scan_put_options(
             "roc": annualized_option_yield,
             "tot_return": tot_return,
             "delta": est_delta,
-            "highest_price": highest_price,
-            "avg_price": avg_price,
-            "lowest_price": lowest_price,
+            "ma_20": ma_20,
+            "ma_50": ma_50,
+            "high_90d": high_90d,
+            "low_90d": low_90d,
             "main_trend": main_trend,
             "iv_hv_ratio": iv_hv_ratio,
             "ex_dividend_date": ex_dividend_date,

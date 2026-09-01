@@ -167,8 +167,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if not price_data:
                 return [], [], [], []
 
-            lowest_price = price_data["low"]
-            highest_price = price_data["high"]
+            high_90d = price_data["high_90d"]
+            low_90d = price_data["low_90d"]
+            ma_20 = price_data["ma_20"]
+            ma_50 = price_data["ma_50"]
             avg_price = price_data["avg_price"]
             avg_price_7d = price_data["avg_price_7d"]
             avg_price_30d = price_data["avg_price_30d"]
@@ -219,7 +221,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 cc_out.extend(cov_calls.scan_covered_calls(
                                     ticker, stock_exchange, d, min_bid_price, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     sector=sector, industry=industry, beta=beta, hv=hv,
                                     df=call_df, ex_dividend_date=ex_dividend_date,
@@ -230,7 +232,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 lc_out.extend(long_calls.scan_long_calls(
                                     ticker, stock_exchange, d, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     hv=hv, sector=sector, industry=industry, beta=beta,
                                     df=call_df, ex_dividend_date=ex_dividend_date,
@@ -245,7 +247,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 po_out.extend(put_options.scan_put_options(
                                     ticker, stock_exchange, d, min_bid_price, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     sector=sector, industry=industry, beta=beta, hv=hv,
                                     df=put_df, ex_dividend_date=ex_dividend_date,
@@ -256,7 +258,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 lp_out.extend(long_puts.scan_long_puts(
                                     ticker, stock_exchange, d, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     hv=hv, sector=sector, industry=industry, beta=beta,
                                     df=put_df, ex_dividend_date=ex_dividend_date,
@@ -267,7 +269,6 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             return cc_out, lc_out, po_out, lp_out
 
         def _process_equity_ticker(t: str) -> tuple[list[dict], list[dict]]:
-            print(t)
             ticker = Assets.Equity(t, exchanges[stock_exchange])
             ticker_data = ticker.get_info()
             if not ticker_data:
@@ -300,8 +301,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if not price_data:
                 return [], []
 
-            lowest_price = price_data["low"]
-            highest_price = price_data["high"]
+            high_90d = price_data["high_90d"]
+            low_90d = price_data["low_90d"]
+            ma_20 = price_data["ma_20"]
+            ma_50 = price_data["ma_50"]
             avg_price = price_data["avg_price"]
             avg_price_7d = price_data["avg_price_7d"]
             avg_price_30d = price_data["avg_price_30d"]
@@ -353,7 +356,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                         try:
                             best = scan_sell(
                                 ticker, stock_exchange, d, min_bid_price, t, price,
-                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                 avg_price_30d, trend, rel_std_deviation,
                                 sector=sector, industry=industry, beta=beta, hv=hv, df=df,
                                 ex_dividend_date=ex_dividend_date, earnings_date=earnings_date)
@@ -364,7 +367,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                         try:
                             best = scan_buy(
                                 ticker, stock_exchange, d, t, price,
-                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                 avg_price_30d, trend, rel_std_deviation,
                                 hv=hv, sector=sector, industry=industry, beta=beta, df=df,
                                 ex_dividend_date=ex_dividend_date, earnings_date=earnings_date)
@@ -390,31 +393,31 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                     if option_no == 0:
                         best_contracts = cov_calls.scan_covered_calls(
                             ticker, stock_exchange, d, min_bid_price, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
                             sector=sector, industry=industry, beta=beta, hv=hv)
                     elif option_no == 1:
                         best_contracts = put_options.scan_put_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
                             sector=sector, industry=industry, beta=beta, hv=hv)
                     elif option_no == 2 and len(options) > config.SPREAD_MIN_EXPIRY_DATES and has_long_itm_options:
                         best_contracts = spread_options.scan_spread_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
                             sector=sector, industry=industry, beta=beta, hv=hv)
                     elif option_no == 3:
                         best_contracts = long_calls.scan_long_calls(
                             ticker, stock_exchange, d, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
                             hv=hv, sector=sector, industry=industry, beta=beta)
                     elif option_no == 4:
                         best_contracts = long_puts.scan_long_puts(
                             ticker, stock_exchange, d, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation,
                             hv=hv, sector=sector, industry=industry, beta=beta)
                     else:
@@ -460,8 +463,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if not price_data:
                 return [], [], [], []
 
-            lowest_price = price_data["low"]
-            highest_price = price_data["high"]
+            high_90d = price_data["high_90d"]
+            low_90d = price_data["low_90d"]
+            ma_20 = price_data["ma_20"]
+            ma_50 = price_data["ma_50"]
             avg_price = price_data["avg_price"]
             avg_price_7d = price_data["avg_price_7d"]
             avg_price_30d = price_data["avg_price_30d"]
@@ -526,7 +531,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 cc_out.extend(cov_calls.scan_covered_calls(
                                     ticker, stock_exchange, d, min_bid_price, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     hv=hv, df=call_df, ex_dividend_date=ex_dividend_date,
                                     earnings_date=earnings_date))
@@ -536,7 +541,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 lc_out.extend(long_calls.scan_long_calls(
                                     ticker, stock_exchange, d, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     hv=hv, df=call_df, ex_dividend_date=ex_dividend_date,
                                     earnings_date=earnings_date))
@@ -550,7 +555,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 po_out.extend(put_options.scan_put_options(
                                     ticker, stock_exchange, d, min_bid_price, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     hv=hv, df=put_df, ex_dividend_date=ex_dividend_date,
                                     earnings_date=earnings_date))
@@ -560,7 +565,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                             try:
                                 lp_out.extend(long_puts.scan_long_puts(
                                     ticker, stock_exchange, d, t, price,
-                                    lowest_price, highest_price, avg_price, avg_price_7d,
+                                    high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                     avg_price_30d, trend, rel_std_deviation,
                                     hv=hv, df=put_df, ex_dividend_date=ex_dividend_date,
                                     earnings_date=earnings_date))
@@ -570,7 +575,6 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             return cc_out, lc_out, po_out, lp_out
 
         def _process_etf_ticker(t: str) -> tuple[list[dict], list[dict]]:
-            print(t)
             ticker = Assets.ETF(t, exchanges[stock_exchange])
             ticker_data = ticker.get_info_etf()
             if not ticker_data:
@@ -600,8 +604,10 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             if not price_data:
                 return [], []
 
-            lowest_price = price_data["low"]
-            highest_price = price_data["high"]
+            high_90d = price_data["high_90d"]
+            low_90d = price_data["low_90d"]
+            ma_20 = price_data["ma_20"]
+            ma_50 = price_data["ma_50"]
             avg_price = price_data["avg_price"]
             avg_price_7d = price_data["avg_price_7d"]
             avg_price_30d = price_data["avg_price_30d"]
@@ -652,7 +658,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                         try:
                             best = scan_sell(
                                 ticker, stock_exchange, d, min_bid_price, t, price,
-                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                 avg_price_30d, trend, rel_std_deviation, hv=hv, df=df,
                                 ex_dividend_date=ex_dividend_date, earnings_date=earnings_date)
                             selling.extend(best)
@@ -662,7 +668,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                         try:
                             best = scan_buy(
                                 ticker, stock_exchange, d, t, price,
-                                lowest_price, highest_price, avg_price, avg_price_7d,
+                                high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                                 avg_price_30d, trend, rel_std_deviation, hv=hv, df=df,
                                 ex_dividend_date=ex_dividend_date, earnings_date=earnings_date)
                             buying.extend(best)
@@ -683,27 +689,27 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                     if option_no == 0:
                         best_contracts = cov_calls.scan_covered_calls(
                             ticker, stock_exchange, d, min_bid_price, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation, hv=hv)
                     elif option_no == 1:
                         best_contracts = put_options.scan_put_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation, hv=hv)
                     elif option_no == 2 and len(options) > config.SPREAD_MIN_EXPIRY_DATES:
                         best_contracts = spread_options.scan_spread_options(
                             ticker, stock_exchange, d, min_bid_price, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation, hv=hv)
                     elif option_no == 3:
                         best_contracts = long_calls.scan_long_calls(
                             ticker, stock_exchange, d, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation, hv=hv)
                     elif option_no == 4:
                         best_contracts = long_puts.scan_long_puts(
                             ticker, stock_exchange, d, t, price,
-                            lowest_price, highest_price, avg_price, avg_price_7d,
+                            high_90d, low_90d, avg_price, ma_20, ma_50, avg_price_7d,
                             avg_price_30d, trend, rel_std_deviation, hv=hv)
                     else:
                         best_contracts = []
