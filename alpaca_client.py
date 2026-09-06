@@ -1,3 +1,4 @@
+import concurrent.futures
 import os
 import time
 import threading
@@ -43,9 +44,12 @@ class _RateLimiter:
 
 
 _limiter = _RateLimiter(180)
+_yf_limiter = _RateLimiter(55)
 
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0
+_CALL_TIMEOUT = 30      # seconds per-ticker calls
+_BULK_TIMEOUT = 180     # seconds for bulk multi-symbol prefetch calls
 
 
 def _is_retryable(e: Exception) -> bool:
@@ -59,11 +63,18 @@ def _is_retryable(e: Exception) -> bool:
     )
 
 
-def _call_with_retry(fn, req):
+def _call_with_retry(fn, req, timeout=_CALL_TIMEOUT):
     for attempt in range(_MAX_RETRIES):
         _limiter.acquire()
         try:
-            return fn(req)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                future = ex.submit(fn, req)
+                return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
+                continue
+            raise TimeoutError(f"Alpaca API call timed out after {timeout}s")
         except Exception as e:
             if _is_retryable(e) and attempt < _MAX_RETRIES - 1:
                 time.sleep(_RETRY_BASE_DELAY * (2 ** attempt))
@@ -71,12 +82,12 @@ def _call_with_retry(fn, req):
             raise
 
 
-def get_latest_trades(req):
-    return _call_with_retry(stock_client.get_stock_latest_trade, req)
+def get_latest_trades(req, timeout=_CALL_TIMEOUT):
+    return _call_with_retry(stock_client.get_stock_latest_trade, req, timeout=timeout)
 
 
-def get_stock_bars(req):
-    return _call_with_retry(stock_client.get_stock_bars, req)
+def get_stock_bars(req, timeout=_CALL_TIMEOUT):
+    return _call_with_retry(stock_client.get_stock_bars, req, timeout=timeout)
 
 
 def get_option_chain(req):

@@ -1,12 +1,15 @@
+import concurrent.futures
 import os
 import sys
 import time
 import functions
 import warnings
 import pandas as pd
+import yfinance as yf
 from pathlib import Path
-from datetime import date as _date, datetime
+from datetime import date as _date, datetime, timedelta
 import Assets
+import alpaca_client
 import config
 import spread_options
 import covered_calls as cov_calls
@@ -14,6 +17,8 @@ import put_options as put_options
 import long_calls
 import long_puts
 from concurrent.futures import ThreadPoolExecutor
+from alpaca.data.requests import StockLatestTradeRequest, StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
 
 STOCK_OPTIONS_DIR = Path("~/shared_data/stock_options").expanduser()
 
@@ -37,6 +42,116 @@ exchanges = config.EXCHANGES
 SCANS = [
     (0, 7), (1, 7), (2, 7),  # NYSE / NASDAQ / ARCA — covered calls + long calls + puts + long puts
 ]
+
+_YF_TIMEOUT = 15
+_PREFETCH_TTL = 1800  # 30 minutes
+
+# Cache: exchange_number -> (timestamp, trades_dict, bars_dict)
+_prefetch_cache: dict[int, tuple[float, dict, dict]] = {}
+
+
+def _yf_call(fn, timeout=_YF_TIMEOUT):
+    alpaca_client._yf_limiter.acquire()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(fn).result(timeout=timeout)
+
+
+def _compute_price_stats_from_bars(symbol: str, bar_list) -> dict:
+    """Compute the same stats as Asset.get_price_stats() from pre-fetched bar data."""
+    try:
+        close_prices = pd.Series(
+            [b.close for b in bar_list],
+            index=[b.timestamp.date() for b in bar_list],
+            dtype=float,
+        ).dropna()
+        if close_prices.empty:
+            return {}
+        high_prices = pd.Series([b.high for b in bar_list], dtype=float)
+        low_prices = pd.Series([b.low for b in bar_list], dtype=float)
+        abs_sd, rel_sd = functions.get_std_dev(symbol, close_prices)
+        return {
+            "ma_20": round(float(close_prices.tail(20).mean()), 2),
+            "ma_50": round(float(close_prices.tail(50).mean()), 2),
+            "high_90d": round(float(high_prices.max()), 2),
+            "low_90d": round(float(low_prices.min()), 2),
+            "first_price": round(float(close_prices.iloc[0]), 2),
+            "last_price": round(float(close_prices.iloc[-1]), 2),
+            "avg_price": round(float(close_prices.mean()), 2),
+            "avg_price_7d": round(float(close_prices.tail(7).mean()), 2),
+            "avg_price_30d": round(float(close_prices.tail(30).mean()), 2),
+            "price_trend": functions.get_price_trend(close_prices.tail(30)),
+            "abs_sd": abs_sd,
+            "rel_sd": rel_sd,
+            "hv": functions.compute_hv(close_prices),
+        }
+    except Exception:
+        return {}
+
+
+def _prefetch_stock_data(ticker_list: list[str], max_stock_price: float, exchange_number: int = -1) -> tuple[dict, dict]:
+    """
+    Bulk-fetch latest trades and 90-day bars for all tickers in two Alpaca calls.
+    Returns (trades_dict, bars_dict) keyed by symbol.
+    Tickers above max_stock_price are excluded from the bars fetch.
+    Results are cached per exchange for 30 minutes to avoid redundant API calls.
+    """
+    # Check cache
+    cached = _prefetch_cache.get(exchange_number)
+    if cached is not None:
+        ts, trades_c, bars_c = cached
+        age = time.time() - ts
+        if age < _PREFETCH_TTL:
+            mins = int(age // 60)
+            secs = int(age % 60)
+            print(f"|-- Using cached prefetch data ({mins}m {secs}s old, TTL 30 min) --|")
+            return trades_c, bars_c
+
+    # 1. Bulk latest trades — filter out tickers with characters Alpaca rejects (e.g. BF/A)
+    clean_list = [t for t in ticker_list if "/" not in t]
+    skipped = len(ticker_list) - len(clean_list)
+    if skipped:
+        print(f"|-- Skipping {skipped} tickers with unsupported characters (e.g. BF/A) --|")
+    print(f"|-- Prefetching latest trades for {len(clean_list)} tickers... --|")
+    try:
+        trade_req = StockLatestTradeRequest(symbol_or_symbols=clean_list)
+        trades = alpaca_client.get_latest_trades(trade_req, timeout=alpaca_client._BULK_TIMEOUT)
+    except Exception as e:
+        err = str(e)
+        if "invalid symbol:" in err:
+            bad = err.split("invalid symbol:")[-1].strip().strip('"').strip("}")
+            clean_list = [t for t in clean_list if t != bad]
+            print(f"|-- Retrying without bad symbol '{bad}' ({len(clean_list)} tickers)... --|")
+            try:
+                trade_req = StockLatestTradeRequest(symbol_or_symbols=clean_list)
+                trades = alpaca_client.get_latest_trades(trade_req, timeout=alpaca_client._BULK_TIMEOUT)
+            except Exception as e2:
+                print(f"|-- Trade prefetch failed ({e2}); will skip tickers without trade data --|")
+                trades = {}
+        else:
+            print(f"|-- Trade prefetch failed ({e}); will skip tickers without trade data --|")
+            trades = {}
+
+    # 2. Filter by price to avoid fetching bars for tickers we'll skip anyway
+    eligible = [t for t in ticker_list if t in trades and float(trades[t].price) <= max_stock_price]
+    print(f"|-- {len(eligible)}/{len(ticker_list)} tickers within price cap; prefetching 90-day bars... --|")
+
+    # 3. Bulk 90-day bars
+    bars: dict = {}
+    if eligible:
+        try:
+            bars_req = StockBarsRequest(
+                symbol_or_symbols=eligible,
+                timeframe=TimeFrame.Day,
+                start=datetime.now() - timedelta(days=90),
+            )
+            resp = alpaca_client.get_stock_bars(bars_req, timeout=alpaca_client._BULK_TIMEOUT)
+            bars = resp.data if resp and resp.data else {}
+        except Exception as e:
+            print(f"|-- Bars prefetch failed ({e}); tickers without cached bars will be skipped --|")
+
+    print(f"|-- Prefetch complete: {len(trades)} trades, {len(bars)} bar sets --|")
+    _prefetch_cache[exchange_number] = (time.time(), trades, bars)
+    return trades, bars
 
 
 def _read_tickers_csv(csv_path: Path) -> tuple[list[str], dict[str, dict]]:
@@ -117,7 +232,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
         sys.exit()
 
     ticker_list, ticker_fundamentals = _read_tickers_csv(csv_file)
-    # ticker_list = ["XBI", "UPRO", "GDXJ"]
+    print(f"|-- Metadata loaded: {len(ticker_list)} tickers from CSV --|")
 
     start_time = time.time()
     print(f"|-- Scanning {option_type[option_no]} options in {exchanges[stock_exchange]} --|")
@@ -132,40 +247,60 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
     all_dates = sorted(set(target_dates) | set(config.LONG_TARGET_DATES))
 
+    # Bulk prefetch: replaces per-ticker StockLatestTradeRequest + StockBarsRequest calls
+    prefetched_trades, prefetched_bars = _prefetch_stock_data(ticker_list, max_stock_price, exchange_number=stock_exchange)
+
     if stock_exchange in [0, 1]:
 
         def _process_equity_ticker_combined(t: str) -> tuple[list, list, list, list]:
-            ticker = Assets.Equity(t, exchanges[stock_exchange])
-            ticker_data = ticker.get_info()
-            if not ticker_data:
+            """Process one equity ticker using pre-fetched price/bars data."""
+            # Price from bulk prefetch
+            trade = prefetched_trades.get(t)
+            if not trade:
+                return [], [], [], []
+            price = float(trade.price)
+            if price > max_stock_price:
                 return [], [], [], []
 
-            price = float(ticker_data["price"])
-            options = ticker_data["options"]
+            # Price stats from bulk prefetch
+            bar_list = prefetched_bars.get(t)
+            if not bar_list:
+                return [], [], [], []
+            price_data = _compute_price_stats_from_bars(t, bar_list)
+            if not price_data:
+                return [], [], [], []
+
+            # Options expiry list from yfinance (can't be batched)
+            try:
+                stock = yf.Ticker(t)
+                options = _yf_call(lambda: stock.options)
+                if not options:
+                    return [], [], [], []
+            except Exception:
+                return [], [], [], []
+
+            # Fundamentals from CSV
             fund = ticker_fundamentals.get(t, {})
+            _today = _date.today()
             sector = fund.get("sector")
             industry = fund.get("industry")
             beta = fund.get("beta")
-            ex_dividend_date = fund.get("ex_dividend_date")
-            earnings_date = fund.get("earnings_date")
-            _today = _date.today()
+
+            ex_dividend_date = fund.get("ex_dividend_date") or None
             if ex_dividend_date:
                 try:
                     ex_dividend_date = ex_dividend_date if _date.fromisoformat(ex_dividend_date) >= _today else None
                 except ValueError:
                     ex_dividend_date = None
+
+            earnings_date = fund.get("earnings_date") or None
             if earnings_date:
                 try:
                     earnings_date = earnings_date if _date.fromisoformat(earnings_date) >= _today else None
                 except ValueError:
                     earnings_date = None
 
-            if price > max_stock_price:
-                return [], [], [], []
-
-            price_data = ticker.get_price_stats()
-            if not price_data:
-                return [], [], [], []
+            ticker = Assets.Equity(t, exchanges[stock_exchange])
 
             high_90d = price_data["high_90d"]
             low_90d = price_data["low_90d"]
@@ -176,7 +311,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             avg_price_30d = price_data["avg_price_30d"]
             trend = price_data["price_trend"]
             rel_std_deviation = price_data["rel_sd"]
-            hv = price_data["hv"]
+            hv = price_data.get("hv", 0.0)
 
             too_volatile_for_selling = rel_std_deviation > std_dev_threshold
 
@@ -198,6 +333,9 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
 
             cc_out, lc_out, po_out, lp_out = [], [], [], []
 
+            # One Alpaca call for the full chain; only keep contracts for our target dates
+            chain_cache = functions.get_alpaca_option_chain_bulk(t, target_dates=set(all_dates))
+
             for d in options:
                 if d not in all_dates:
                     continue
@@ -215,7 +353,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                 need_put = is_selling or is_buying_put
 
                 if need_call:
-                    call_df = functions.get_alpaca_option_chain(t, d, "call")
+                    call_df = chain_cache.get((d, "call"), pd.DataFrame())
                     if not call_df.empty:
                         if is_selling:
                             try:
@@ -241,7 +379,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 pass
 
                 if need_put:
-                    put_df = functions.get_alpaca_option_chain(t, d, "put")
+                    put_df = chain_cache.get((d, "put"), pd.DataFrame())
                     if not put_df.empty:
                         if is_selling:
                             try:
@@ -448,20 +586,44 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
     elif stock_exchange == 2:
 
         def _process_etf_ticker_combined(t: str) -> tuple[list, list, list, list]:
-            ticker = Assets.ETF(t, exchanges[stock_exchange])
-            ticker_data = ticker.get_info_etf()
-            if not ticker_data:
+            """Process one ETF ticker using pre-fetched price/bars data."""
+            # Price from bulk prefetch
+            trade = prefetched_trades.get(t)
+            if not trade:
                 return [], [], [], []
-
-            price = float(ticker_data["price"])
-            options = ticker_data["options"]
-
+            price = float(trade.price)
             if price > max_stock_price:
                 return [], [], [], []
 
-            price_data = ticker.get_price_stats()
+            # Price stats from bulk prefetch
+            bar_list = prefetched_bars.get(t)
+            if not bar_list:
+                return [], [], [], []
+            price_data = _compute_price_stats_from_bars(t, bar_list)
             if not price_data:
                 return [], [], [], []
+
+            # Options expiry list from yfinance (can't be batched)
+            try:
+                stock = yf.Ticker(t)
+                options = _yf_call(lambda: stock.options)
+                if not options:
+                    return [], [], [], []
+            except Exception:
+                return [], [], [], []
+
+            # Fundamentals from CSV
+            fund = ticker_fundamentals.get(t, {})
+            _today = _date.today()
+            ex_dividend_date = fund.get("ex_dividend_date") or None
+            if ex_dividend_date:
+                try:
+                    ex_dividend_date = ex_dividend_date if _date.fromisoformat(ex_dividend_date) >= _today else None
+                except ValueError:
+                    ex_dividend_date = None
+            earnings_date = None  # ETFs don't have earnings dates
+
+            ticker = Assets.ETF(t, exchanges[stock_exchange])
 
             high_90d = price_data["high_90d"]
             low_90d = price_data["low_90d"]
@@ -472,33 +634,13 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
             avg_price_30d = price_data["avg_price_30d"]
             trend = price_data["price_trend"]
             rel_std_deviation = price_data["rel_sd"]
-            hv = price_data["hv"]
-
+            hv = price_data.get("hv", 0.0)
             too_volatile_for_selling = rel_std_deviation > std_dev_threshold
-            fund = ticker_fundamentals.get(t, {})
-            ex_dividend_date = fund.get("ex_dividend_date")
-            earnings_date = fund.get("earnings_date")
-            _today = _date.today()
-            if ex_dividend_date:
-                try:
-                    ex_dividend_date = ex_dividend_date if _date.fromisoformat(ex_dividend_date) >= _today else None
-                except ValueError:
-                    ex_dividend_date = None
-            if earnings_date:
-                try:
-                    earnings_date = earnings_date if _date.fromisoformat(earnings_date) >= _today else None
-                except ValueError:
-                    earnings_date = None
 
             if len(options) == 0:
                 return [], [], [], []
 
             earnings_dt = None
-            if earnings_date:
-                try:
-                    earnings_dt = datetime.strptime(earnings_date, "%Y-%m-%d").date()
-                except ValueError:
-                    pass
             ex_div_dt = None
             if ex_dividend_date:
                 try:
@@ -507,6 +649,9 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                     pass
 
             cc_out, lc_out, po_out, lp_out = [], [], [], []
+
+            # One Alpaca call for the full chain; only keep contracts for our target dates
+            chain_cache = functions.get_alpaca_option_chain_bulk(t, target_dates=set(all_dates))
 
             for d in options:
                 if d not in all_dates:
@@ -525,7 +670,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                 need_put = is_selling or is_buying_put
 
                 if need_call:
-                    call_df = functions.get_alpaca_option_chain(t, d, "call")
+                    call_df = chain_cache.get((d, "call"), pd.DataFrame())
                     if not call_df.empty:
                         if is_selling:
                             try:
@@ -549,7 +694,7 @@ def main(exchange_number: int = 0, option_type_input: int | None = None):
                                 pass
 
                 if need_put:
-                    put_df = functions.get_alpaca_option_chain(t, d, "put")
+                    put_df = chain_cache.get((d, "put"), pd.DataFrame())
                     if not put_df.empty:
                         if is_selling:
                             try:

@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 import yfinance as yf
 import numpy as np
@@ -9,6 +10,7 @@ from datetime import date, datetime
 from dateutil.relativedelta import relativedelta
 import alpaca_client
 from alpaca.data.requests import OptionChainRequest
+from alpaca.data.enums import OptionsFeed
 from alpaca.trading.enums import ContractType
 
 
@@ -180,6 +182,96 @@ def normalize_nullable_float(value) -> float | None:
         return None
 
 
+def get_alpaca_option_chain_bulk(symbol: str, target_dates: set[str] | None = None) -> dict[tuple[str, str], pd.DataFrame]:
+    """
+    Fetch the full option chain for a symbol in one Alpaca API call (all expiries, both types).
+    Returns {(expiry_date, "call"|"put"): DataFrame}.  OI is fetched from yfinance in parallel
+    across all expiry dates (one yfinance call per expiry instead of one per expiry+type).
+    """
+    try:
+        req = OptionChainRequest(
+            underlying_symbol=symbol,
+            feed=OptionsFeed.INDICATIVE,
+        )
+        chain = alpaca_client.get_option_chain(req)
+    except Exception:
+        return {}
+
+    if not chain:
+        return {}
+
+    # Parse contract symbols to extract expiry and type.
+    # OCC format: {ticker}{YYMMDD}{C|P}{8-digit-strike}
+    # The last 15 chars are always YYMMDD + C|P + 00000000
+    contracts_by_key: dict[tuple[str, str], list] = {}
+    for contract_sym, snap in chain.items():
+        if snap.latest_quote is None:
+            continue
+        if not snap.implied_volatility:
+            continue
+        try:
+            date_part = contract_sym[-15:-9]          # YYMMDD
+            type_char = contract_sym[-9]               # C or P
+            expiry = f"20{date_part[:2]}-{date_part[2:4]}-{date_part[4:]}"
+            opt_type = "call" if type_char == "C" else "put"
+        except Exception:
+            continue
+        if target_dates is not None and expiry not in target_dates:
+            continue
+        key = (expiry, opt_type)
+        contracts_by_key.setdefault(key, []).append({
+            "contractSymbol": contract_sym,
+            "bid": snap.latest_quote.bid_price or 0.0,
+            "ask": snap.latest_quote.ask_price or 0.0,
+            "strike": int(contract_sym[-8:]) / 1000,
+            "impliedVolatility": snap.implied_volatility,
+            "openInterest": 0,
+        })
+
+    if not contracts_by_key:
+        return {}
+
+    # Fetch OI from yfinance once per unique expiry (covers both calls and puts)
+    unique_expiries = list({exp for exp, _ in contracts_by_key})
+
+    def _fetch_yf_expiry(exp: str) -> dict[str, int]:
+        try:
+            def _inner():
+                yf_chain = yf.Ticker(symbol).option_chain(exp)
+                result: dict[str, int] = {}
+                for df in [yf_chain.calls, yf_chain.puts]:
+                    if df is not None and not df.empty and "openInterest" in df.columns:
+                        result.update(
+                            df.set_index("contractSymbol")["openInterest"]
+                            .fillna(0)
+                            .astype(int)
+                            .to_dict()
+                        )
+                return result
+            alpaca_client._yf_limiter.acquire()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                return ex.submit(_inner).result(timeout=20)
+        except Exception:
+            return {}
+
+    oi_map: dict[str, int] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        futures = {ex.submit(_fetch_yf_expiry, exp): exp for exp in unique_expiries}
+        for f in concurrent.futures.as_completed(futures):
+            try:
+                oi_map.update(f.result())
+            except Exception:
+                pass
+
+    result: dict[tuple[str, str], pd.DataFrame] = {}
+    for key, rows in contracts_by_key.items():
+        for row in rows:
+            row["openInterest"] = oi_map.get(row["contractSymbol"], 0)
+        result[key] = pd.DataFrame(rows)
+
+    return result
+
+
 def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> pd.DataFrame:
     ct = ContractType.CALL if option_type.lower() in ("call", "calls", "c") else ContractType.PUT
     try:
@@ -187,6 +279,7 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
             underlying_symbol=symbol,
             expiration_date=expiry_date,
             type=ct,
+            feed=OptionsFeed.INDICATIVE,
         )
         chain = alpaca_client.get_option_chain(req)
     except Exception:
@@ -197,8 +290,15 @@ def get_alpaca_option_chain(symbol: str, expiry_date: str, option_type: str) -> 
 
     oi_map = {}
     try:
-        yf_chain = yf.Ticker(symbol).option_chain(expiry_date)
-        yf_df = yf_chain.calls if ct == ContractType.CALL else yf_chain.puts
+        def _fetch_yf(sym, exp, call_type):
+            chain = yf.Ticker(sym).option_chain(exp)
+            return chain.calls if call_type == ContractType.CALL else chain.puts
+
+        alpaca_client._yf_limiter.acquire()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(_fetch_yf, symbol, expiry_date, ct)
+            yf_df = fut.result(timeout=20)
+
         if yf_df is not None and not yf_df.empty and "openInterest" in yf_df.columns:
             oi_map = (
                 yf_df.set_index("contractSymbol")["openInterest"]
@@ -356,9 +456,10 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "delta",
             "sector",
             "industry",
-            "highest_price",
-            "avg_price",
-            "lowest_price",
+            "ma_20",
+            "ma_50",
+            "high_90d",
+            "low_90d",
             "main_trend",
             "beta",
             "iv_hv_ratio",
@@ -390,9 +491,10 @@ def write_best_options_to_json(path: str, exchange_no: int, sorted_option_list: 
             "roc",
             "tot_return",
             "delta",
-            "highest_price",
-            "avg_price",
-            "lowest_price",
+            "ma_20",
+            "ma_50",
+            "high_90d",
+            "low_90d",
             "main_trend",
             "iv_hv_ratio",
             "ex_dividend_date",
