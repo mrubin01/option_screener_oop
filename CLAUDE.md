@@ -59,19 +59,19 @@ The screener iterates over a ticker list, fetches market data via Alpaca (price,
 
 **Data flow:**
 1. `main.py` reads `~/shared_data/stock_options/stocks_with_options_{exchange}.csv` and parses ticker + fundamentals
-2. For each ticker it instantiates either `Assets.Equity` or `Assets.ETF`
-3. It calls `.get_info()` / `.get_info_etf()` (Alpaca price + yfinance options expiry list) and `.get_price_stats()` — both return dicts or `{}` on failure
+2. `_prefetch_stock_data()` bulk-fetches latest trades and 90-day bars for all tickers in **2 Alpaca calls** (one `StockLatestTradeRequest`, one `StockBarsRequest`), filtered to tickers within the price cap; results cached per exchange for 30 minutes
+3. For each ticker (in parallel): price comes from the prefetch cache; price stats are computed by `_compute_price_stats_from_bars()`; options expiry list comes from `yf.Ticker(t).options` via `_yf_call()` (rate-limited by `_yf_limiter`); fundamentals come from `ticker_fundamentals` (loaded from CSV in step 1)
 4. Pre-filters: price > exchange threshold and `rel_std_deviation > STD_DEV_THRESHOLD` skip the ticker for selling (buying proceeds regardless of CoV)
 4a. Date normalisation: `ex_dividend_date` and `earnings_date` from the CSV are set to `None` in `main.py` if the date is already in the past — so only future dates reach the per-date gate and the output JSON
-5. In type 7 (Combined All) mode, all four strategies run for the same ticker in one pass — selling dates use `config.TARGET_DATES` (next 3 Fridays), buying dates use `config.LONG_TARGET_DATES` (3rd and 4th Fridays); calls and puts share the same chain fetch when the date qualifies for both
+5. In type 7 (Combined All) mode, `get_alpaca_option_chain_bulk()` fetches the full chain for a ticker in **1 Alpaca call** (all expiries, both call and put), then all four strategies run for the same ticker in one pass — selling dates use `config.TARGET_DATES` (next 3 Fridays), buying dates use `config.LONG_TARGET_DATES` (3rd and 4th Fridays)
 5a. Per-date gate in the combined loop: selling is also blocked when earnings or ex-dividend date falls within DTE; buying is blocked when earnings fall within DTE; long calls are additionally blocked when ex-dividend falls within DTE (ex-div drops the stock price, hurting calls); long puts are NOT blocked on ex-div (the drop helps puts)
 6. Matched contracts are collected in four separate lists (covered calls, long calls, put options, long puts), sorted by `option_yield` descending (selling) or `iv_hv_ratio` ascending (buying), and written to four JSON files per scan via `functions.write_best_options_to_json()`
 
 **Module responsibilities:**
 - `config.py` — all tunable globals and filter thresholds. `TARGET_DATES` is auto-computed (next 3 Fridays). `LONG_TARGET_DATES` is auto-computed (3rd and 4th Fridays). `TYPE` is no longer edited per run — the full automated run cycles all 3 scans using type 7. `OPTION_TYPE` list has indices 0–7; index 7 ("Combined All") is used by `SCANS` and runs all four strategies (covered calls, long calls, put options, long puts) in a single ticker pass. Exchange-specific thresholds (`NYSE_NASDAQ_MAX_STOCK_PRICE`, `ARCA_MAX_STOCK_PRICE`, `NYSE_NASDAQ_MIN_BID_PRICE`, `ARCA_MIN_BID_PRICE`) are read inside `main()` from the actual exchange argument. Selling-side filters (`SELL_MIN_MONEYNESS`, `SELL_MIN_OPEN_INTEREST`, `SELL_MIN_IV_HV_RATIO`) and buying-side filters (`LONG_MAX_MONEYNESS`, `LONG_MAX_IV_HV_RATIO`, `LONG_MIN_OPEN_INTEREST`, `LONG_MIN_ASK`, `LONG_MAX_ASK`, `LONG_MIN_DELTA`) are also defined here. Spread-specific constants (`SPREAD_MIN_EXPIRY_DATES`, `SPREAD_MIN_ITM_DISTANCE`) remain in config but spreads are not active in `SCANS`.
-- `alpaca_client.py` — initializes `StockHistoricalDataClient`, `OptionHistoricalDataClient`, and `TradingClient` from `.env` credentials; exposes a token-bucket `_RateLimiter` (180/min) and four rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`, `get_option_contracts`) used by `Assets.py` and `functions.py`
-- `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. Price via Alpaca `StockLatestTradeRequest`; historical bars via Alpaca `StockBarsRequest` (90-day window); `get_price_stats()` computes `high_90d`/`low_90d` from actual bar high/low data, `ma_20`/`ma_50` (20- and 50-day moving averages of close), HV (annualised historical volatility from 90-day log returns), and `price_trend` (linear regression slope over the **last 30 bars** only); all yfinance calls wrapped in `_yf_call()` with a 15-second timeout to prevent thread hangs; options expiry list via yfinance only (all fundamentals now come from the CSV files, not yfinance)
-- `functions.py` — shared utilities: `get_alpaca_option_chain` (Alpaca options snapshots → DataFrame, fetches open interest via `TradingClient.get_option_contracts`), `compute_hv`, `compute_main_trend` (uses 7d and 30d averages only — 90d dropped to match near-term option DTE), `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
+- `alpaca_client.py` — initializes `StockHistoricalDataClient` and `OptionHistoricalDataClient` from `.env` credentials; exposes two token-bucket rate limiters (`_limiter` at 180/min for Alpaca, `_yf_limiter` at 55/min for yfinance) and three rate-limited wrappers (`get_latest_trades`, `get_stock_bars`, `get_option_chain`); all Alpaca wrappers use `_call_with_retry()` which wraps each call in `ThreadPoolExecutor` with `_CALL_TIMEOUT=30s` (per-ticker) or `_BULK_TIMEOUT=180s` (bulk prefetch) to prevent hangs; up to 3 retries on transient errors
+- `Assets.py` — `Asset` base class; `Equity` and `ETF` subclasses. `get_price_stats()` fetches 90-day bars via Alpaca and computes `high_90d`/`low_90d` from actual bar high/low data, `ma_20`/`ma_50` (20- and 50-day moving averages of close), HV (annualised historical volatility from 90-day log returns), and `price_trend` (linear regression slope over the **last 30 bars** only); all yfinance calls wrapped in `_yf_call()` with a 15-second timeout; `get_info()` / `get_info_etf()` are only called in the legacy single-mode paths — the type-7 combined path in `main.py` bypasses them and uses `_prefetch_stock_data()` instead
+- `functions.py` — shared utilities: `get_alpaca_option_chain_bulk()` (fetches full chain for a ticker in one Alpaca call — all expiries and both types — then fills OI from yfinance in parallel across unique expiries via `_yf_limiter`); `get_alpaca_option_chain()` (per-expiry per-type fetch, used in legacy paths, also rate-limits yfinance with `_yf_limiter`); `compute_hv`, `compute_main_trend` (uses 7d and 30d averages only), `sigma_distance_to_strike`, `estimate_delta` (uses `py_vollib` Black-Scholes), `get_std_dev`, `get_price_trend` (linear regression), `write_best_options_to_json`
 - `covered_calls.py` — single `scan_covered_calls` handling both Equity and ETF; equity fields (`sector`, `industry`, `beta`) added when `exchange in [0, 1]`; trend filter skips downtrend stocks (`main_trend < 0`) — assignment is the best-case outcome (premium + capital gain), so only flat or uptrend stocks qualify; moneyness filter requires strike ≥ 5% OTM (`SELL_MIN_MONEYNESS`); includes `iv_hv_ratio`, `ex_dividend_date`, `earnings_date` per contract
 - `put_options.py` — single `scan_put_options` handling both Equity and ETF; same equity field pattern; trend filter skips downtrend stocks (`main_trend < 0`); moneyness filter requires strike ≥ 5% OTM (`SELL_MIN_MONEYNESS`); includes `iv_hv_ratio`, `ex_dividend_date`, `earnings_date` per contract
 - `spread_options.py` — `scan_long_cov_calls` (pre-check for deep ITM long calls) + `scan_spread_options` (alias of `scan_covered_calls` from covered_calls)
@@ -120,11 +120,11 @@ git push --force origin main   # only if broken changes were already pushed
 
 The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in parallel (I/O-bound workload — threads, not processes).
 
-**Rate limiter** — `alpaca_client.py` exposes a module-level `_RateLimiter` (token bucket, 180 calls/min — conservative buffer under Alpaca's 200/min ceiling) and four thin wrapper functions that every Alpaca call goes through:
-- `alpaca_client.get_latest_trades(req)` — used by `Assets.get_info()` / `get_info_etf()`
-- `alpaca_client.get_stock_bars(req)` — used by `Assets.get_price_stats()`
-- `alpaca_client.get_option_chain(req)` — used by `functions.get_alpaca_option_chain()`
-- `alpaca_client.get_option_contracts(req)` — used by `functions.get_alpaca_option_chain()` to fetch open interest per contract via `TradingClient`
+**Rate limiters** — `alpaca_client.py` exposes two token-bucket rate limiters:
+- `_limiter` (180/min) — guards all three Alpaca wrapper functions (`get_latest_trades`, `get_stock_bars`, `get_option_chain`)
+- `_yf_limiter` (55/min) — acquired in `main._yf_call()` before every yfinance `stock.options` call, and in `functions.get_alpaca_option_chain_bulk()` / `get_alpaca_option_chain()` before every OI fetch from yfinance
+
+**Bulk prefetch** — before the per-ticker loop, `_prefetch_stock_data()` issues 2 Alpaca calls to prefetch all trades and 90-day bars at once; results are cached per exchange for 30 minutes. `_compute_price_stats_from_bars()` converts a pre-fetched bar list into the same stats dict as `Asset.get_price_stats()`. In the per-ticker loop, `_yf_call()` fetches the options expiry list from yfinance (rate-limited), and `get_alpaca_option_chain_bulk()` fetches the full chain in 1 Alpaca call (vs. up to 10 per-date per-type calls previously).
 
 **Parallelism** — `main.py` extracts per-ticker logic into `_process_equity_ticker_combined()` and `_process_etf_ticker_combined()` (type 7 — all 4 strategies per ticker), plus legacy `_process_equity_ticker()` / `_process_etf_ticker()` for backward-compat single modes. Type 7 uses `ThreadPoolExecutor(max_workers=12)`; legacy paths use `max_workers=8`. The rate limiter is the throughput ceiling.
 
@@ -133,14 +133,15 @@ The screener uses `concurrent.futures.ThreadPoolExecutor` to process tickers in 
 ## Data sources
 
 **Alpaca** (primary — requires free brokerage account at alpaca.markets):
-- Current price → `StockLatestTradeRequest` in `Assets.get_info()` / `get_info_etf()`
-- 90-day historical bars → `StockBarsRequest` in `Assets.get_price_stats()`
-- Options chain (bid/ask/IV per expiry) → `OptionChainRequest` in `functions.get_alpaca_option_chain()`
-- Open interest per contract → `GetOptionContractsRequest` via `TradingClient` in `functions.get_alpaca_option_chain()`
+- Current price (all tickers, bulk) → `StockLatestTradeRequest` in `main._prefetch_stock_data()`
+- 90-day historical bars (all tickers, bulk) → `StockBarsRequest` in `main._prefetch_stock_data()`
+- Full option chain per ticker (all expiries + types in one call) → `OptionChainRequest` (no expiration filter) in `functions.get_alpaca_option_chain_bulk()`
+- Per-expiry per-type chain (legacy single-mode paths) → `OptionChainRequest` in `functions.get_alpaca_option_chain()`
 - Production limit: **200 requests/minute** (rate limiter set to 180 as a safety buffer)
 
-**yfinance** (retained for options expiry list only):
-- Options expiry date list → `yf.Ticker(symbol).options` in `Assets.get_info()` / `get_info_etf()`
+**yfinance** (used for options expiry list and open interest):
+- Options expiry date list → `yf.Ticker(symbol).options` called via `main._yf_call()` per ticker (rate-limited by `_yf_limiter` at 55/min)
+- Open interest → `yf.Ticker(symbol).option_chain(expiry)` in `functions.get_alpaca_option_chain_bulk()` (once per unique expiry, parallel) and `get_alpaca_option_chain()` (once per chain fetch)
 
 **External CSV files** (`~/shared_data/stock_options/`):
 - Sector, industry, beta, ex_dividend_date, earnings_date → parsed by `main._read_tickers_csv()` at scan startup; no yfinance `.info` call needed; date fields are optional (empty = `null`)
